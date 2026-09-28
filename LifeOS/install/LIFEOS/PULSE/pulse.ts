@@ -13,18 +13,29 @@
  * One process. One port. One launchd plist. One log file.
  */
 
-import { join } from "path"
-import { readFileSync, existsSync } from "fs"
+import { isAbsolute, join } from "path"
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "fs"
 import { loadLifeosConfig } from "../TOOLS/LifeosConfig"
+import { resolveRuntimePaths } from "../TOOLS/RuntimePaths.ts"
 import { isLoopbackHostHeader } from "./lib/host-guard.ts"
+import { buildCapabilities } from "./lib/capabilities.ts"
 
 // ── Load .env before anything else ──
 
-const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir()
-const LIFEOS_DIR = join(HOME, ".claude", "LIFEOS")
-const PULSE_DIR = join(LIFEOS_DIR, "PULSE")
+const RUNTIME_PATHS = resolveRuntimePaths()
+const HOME = RUNTIME_PATHS.home
+const LIFEOS_DIR = RUNTIME_PATHS.lifeosDir
+const PULSE_DIR = RUNTIME_PATHS.pulseDir
 
-const envPath = join(HOME, ".claude", ".env")
+// Child tools inherit explicit roots. This is essential in Task Scheduler and
+// desktop sessions, where HOME/PATH can differ from an interactive terminal.
+process.env.HOME ||= HOME
+process.env.LIFEOS_DIR ||= LIFEOS_DIR
+process.env.CLAUDE_CONFIG_DIR ||= RUNTIME_PATHS.configRoot
+process.env.LIFEOS_CONFIG_PATH ||= RUNTIME_PATHS.configPath
+process.env.PULSE_DIR ||= PULSE_DIR
+
+const envPath = RUNTIME_PATHS.envPath
 try {
   const envContent = readFileSync(envPath, "utf-8")
   for (const line of envContent.split("\n")) {
@@ -64,14 +75,14 @@ import {
   log,
   dispatch,
   isSentinel,
-  spawnScript,
+  runScriptJob,
+  jobUnsupportedReason,
   spawnClaude,
   parseConfigToml,
   resolveModules,
 } from "./lib"
 
 import { startHooks, handleHooksRequestAsync, hooksHealth } from "./modules/hooks"
-import { homedir } from "node:os";
 
 // Conditional imports — modules may not exist yet during incremental migration
 let voiceModule: any = null
@@ -243,12 +254,15 @@ async function loadModules(config: PulseConfig) {
       log("warn", "Conduit module not available", { error: String(err) })
     }
   }
-  // Menu bar — cross-subsystem aggregator behind the rich native menu bar dropdown.
-  try {
-    menubarModule = await import("./modules/menubar")
-    if (menubarModule.start) menubarModule.start()
-  } catch (err) {
-    log("warn", "Menubar module not available", { error: String(err) })
+  // The native menu-bar application is macOS-only. Do not load its filesystem
+  // collector on Windows merely because the HTTP daemon is cross-platform.
+  if (process.platform === "darwin") {
+    try {
+      menubarModule = await import("./modules/menubar")
+      if (menubarModule.start) menubarModule.start()
+    } catch (err) {
+      log("warn", "Menubar module not available", { error: String(err) })
+    }
   }
   // Books — favorite-books surface over USER/BOOKS.md.
   if (config.modules.books) {
@@ -423,7 +437,7 @@ async function loadPulseConfig(): Promise<PulseConfig> {
   // [da].name. Defer to it when present; fresh installs without the user config keep PULSE.toml.
   const da = (parsed.da as PulseConfig["da"]) ?? { enabled: false }
   try {
-    const daName = loadLifeosConfig().da.name
+    const daName = loadLifeosConfig({ path: RUNTIME_PATHS.configPath }).da.name
     if (daName) da.primary = daName
   } catch { /* LIFEOS_CONFIG.toml absent/invalid — keep PULSE.toml value */ }
 
@@ -471,6 +485,15 @@ const LIFE_ROUTE_MODULES: Record<string, string> = {
 
 const STATE_PATH = join(PULSE_DIR, "state", "state.json")
 const PID_PATH = join(PULSE_DIR, "state", "pulse.pid")
+const LOCK_PATH = join(PULSE_DIR, "state", "pulse.lock.json")
+const INSTANCE_ID = crypto.randomUUID()
+
+function releaseOwnedLock(): void {
+  try {
+    const owned = JSON.parse(readFileSync(LOCK_PATH, "utf8")) as { instanceId?: string }
+    if (owned.instanceId === INSTANCE_ID) unlinkSync(LOCK_PATH)
+  } catch { /* lock was never acquired, already removed, or replaced */ }
+}
 const MAX_FAILURES = 3
 // A latched job (>= MAX_FAILURES) gets one retry attempt after this cooldown
 // instead of being dead until manual state surgery — three transient failures
@@ -526,7 +549,7 @@ function msUntilNextDue(jobs: PulseConfig["jobs"], state: DaemonState): number {
 // /healthz reported "ok". The dashboard asset check makes /healthz truthful.
 function dashboardDir(config: PulseConfig): string {
   const dir = config.observability?.dashboard_dir ?? "Observability/out"
-  return dir.startsWith("/") ? dir : join(PULSE_DIR, dir)
+  return isAbsolute(dir) ? dir : join(PULSE_DIR, dir)
 }
 
 function dashboardHealth(config: PulseConfig): { status: "ok" | "missing"; indexPath: string } {
@@ -534,12 +557,30 @@ function dashboardHealth(config: PulseConfig): { status: "ok" | "missing"; index
   return { status: existsSync(indexPath) ? "ok" : "missing", indexPath }
 }
 
+function voicePlaybackAvailable(config: PulseConfig): boolean {
+  if (!config.modules.voice) return true
+  if (!voiceModule) return false
+  try {
+    const health = voiceModule.voiceHealth() as { playback_status?: string }
+    return health.playback_status !== "degraded"
+  } catch {
+    return false
+  }
+}
+
 function buildHealthResponse(state: DaemonState, config: PulseConfig): Response {
   const subsystems: Record<string, unknown> = {}
+  const capabilities = buildCapabilities(config.modules, {
+    voiceLoaded: voicePlaybackAvailable(config),
+    observabilityLoaded: config.observability?.enabled === false || observabilityModule !== null,
+  })
 
   // Cron jobs
   subsystems.cron = {
     status: "ok",
+    unsupported: config.jobs
+      .map((job) => ({ name: job.name, reason: jobUnsupportedReason(job) }))
+      .filter((job) => Boolean(job.reason)),
     jobs: Object.entries(state.jobs).map(([name, s]) => ({
       name,
       lastRun: new Date(s.lastRun).toISOString(),
@@ -613,10 +654,14 @@ function buildHealthResponse(state: DaemonState, config: PulseConfig): Response 
     status,
     reasons,
     service: "pulse",
+    instanceId: INSTANCE_ID,
+    runtimeRoot: LIFEOS_DIR,
+    platform: process.platform,
     pid: process.pid,
     port: config.port,
     startedAt: new Date(state.startedAt).toISOString(),
     uptime: Math.round((Date.now() - state.startedAt) / 1000),
+    capabilities,
     subsystems,
   }, { status: httpStatus })
 }
@@ -624,27 +669,32 @@ function buildHealthResponse(state: DaemonState, config: PulseConfig): Response 
 // ── Main ──
 
 async function main() {
-  // Singleton guard — a second live pulse.ts means duplicate pollers, cron
-  // jobs, and voice servers fighting over the same state (2026-07-09 incident:
-  // an orphaned hand-launched pulse fought the launchd one for hours).
-  // Refuse to boot instead.
-  try {
-    const oldPid = parseInt((await Bun.file(PID_PATH).text()).trim(), 10)
-    if (oldPid && oldPid !== process.pid) {
-      process.kill(oldPid, 0) // throws if oldPid is dead → guard passes
-      const cmd = new TextDecoder()
-        .decode(Bun.spawnSync(["ps", "-p", String(oldPid), "-o", "command="]).stdout)
-        .trim()
-      if (cmd.includes("pulse.ts")) {
-        log("error", "Another pulse.ts is already running — refusing to start a duplicate", {
-          existingPid: oldPid,
-          existingCommand: cmd,
-        })
+  // Cross-platform singleton ownership. The old guard used `ps`, which is not
+  // available in native Windows sessions and could mistake any bun process for
+  // Pulse. An exclusive lock identifies the PID, instance, and owning root.
+  mkdirSync(join(PULSE_DIR, "state"), { recursive: true })
+  const lock = { pid: process.pid, instanceId: INSTANCE_ID, runtimeRoot: LIFEOS_DIR, startedAt: new Date().toISOString() }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const fd = openSync(LOCK_PATH, "wx")
+      try { writeFileSync(fd, JSON.stringify(lock, null, 2) + "\n") } finally { closeSync(fd) }
+      break
+    } catch (err: any) {
+      if (err?.code !== "EEXIST") throw err
+      let existing: { pid?: number; instanceId?: string; runtimeRoot?: string } = {}
+      try { existing = JSON.parse(readFileSync(LOCK_PATH, "utf8")) } catch { /* malformed lock is stale */ }
+      let live = false
+      if (existing.pid) {
+        try { process.kill(existing.pid, 0); live = true } catch { live = false }
+      }
+      if (live) {
+        log("error", "Another Pulse instance owns this user session — refusing to start a duplicate", { existing })
         process.exit(1)
       }
+      try { unlinkSync(LOCK_PATH) } catch { /* another starter won the race */ }
+      if (attempt === 1) throw new Error(`Unable to acquire Pulse lock: ${LOCK_PATH}`)
     }
-  } catch { /* stale or missing pid file — normal boot */ }
-
+  }
   await Bun.write(PID_PATH, String(process.pid))
 
   const config = await loadPulseConfig()
@@ -833,7 +883,13 @@ async function main() {
       // module leaves a nav entry that opens an empty page.
       // ported from public PR #1748, @elhoim
       if (req.method === "GET" && pathname === "/api/config/modules") {
-        return Response.json({ modules: config.modules })
+        return Response.json({
+          modules: config.modules,
+          capabilities: buildCapabilities(config.modules, {
+            voiceLoaded: voicePlaybackAvailable(config),
+            observabilityLoaded: config.observability?.enabled === false || observabilityModule !== null,
+          }),
+        })
       }
 
       // Voice routes: /notify, /notify/personality, /voice, /voice/health
@@ -1086,14 +1142,21 @@ async function main() {
   // (public issue #1392).
   const missingScriptJobs = new Set<string>()
   for (const job of config.jobs) {
-    if (!job.enabled || job.type === "claude" || !job.command) continue
-    const scriptRefs = job.command.match(/[^\s'"]+\.(?:ts|js|sh)\b/g) ?? []
-    // Resolve like the executor does: spawnScript runs via bash -c, so "~/"
-    // expands to HOME at runtime — the existence check must match or every
-    // "~/" job gets falsely disabled as "not present on this install".
+    if (!job.enabled || job.type === "claude") continue
+    const unsupported = jobUnsupportedReason(job)
+    if (unsupported) {
+      missingScriptJobs.add(job.name)
+      log("warn", `Skipping cron job ${job.name}: unsupported`, { reason: unsupported, subsystem: "cron" })
+      continue
+    }
+    const scriptRefs = job.program
+      ? (job.args ?? []).filter((arg) => /\.(?:ts|js|sh)$/iu.test(arg))
+      : (job.command?.match(/[^\s'"]+\.(?:ts|js|sh)\b/g) ?? [])
+    // Resolve like the executor does so a legacy "~/" path and a structured
+    // working directory are checked against the same location they will run.
     const resolveRef = (p: string): string => {
-      if (p.startsWith("~/")) return join(homedir(), p.slice(2))
-      return p.startsWith("/") ? p : join(PULSE_DIR, p)
+      if (p.startsWith("~/") || p.startsWith("~\\")) return join(HOME, p.slice(2))
+      return isAbsolute(p) ? p : join(job.working_dir ?? PULSE_DIR, p)
     }
     const missing = scriptRefs.filter((p) => !existsSync(resolveRef(p)))
     if (missing.length > 0) {
@@ -1161,7 +1224,7 @@ async function main() {
         if (job.type === "claude") {
           output = await spawnClaude(job.prompt!, { model: job.model ?? "sonnet" })
         } else {
-          output = await spawnScript(job.command!, job.timeout_ms)
+          output = await runScriptJob(job, PULSE_DIR)
         }
 
         const durationMs = Date.now() - startMs
@@ -1208,12 +1271,14 @@ async function main() {
   server.stop()
   if (imessageModule) imessageModule.stopIMessage?.()
   if (assistantModule) assistantModule.stopAssistant?.()
+  releaseOwnedLock()
   if (syslogModule) await syslogModule.stop?.()
   await writeState(STATE_PATH, state).catch(() => {})
   log("info", "LifeOS Pulse stopped", { uptimeMs: Date.now() - state.startedAt })
 }
 
 main().catch((err) => {
+  releaseOwnedLock()
   log("error", "Pulse crashed", { error: String(err) })
   process.exit(1)
 })

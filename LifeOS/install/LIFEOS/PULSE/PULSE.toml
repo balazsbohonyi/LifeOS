@@ -161,7 +161,10 @@ growth_schedule = "0 4 * * 0"
 name = "cost-aggregation"
 schedule = "*/15 * * * *"
 type = "script"
-command = "bun run Performance/cost-aggregator.ts"
+program = "bun"
+args = ["run", "Performance/cost-aggregator.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 output = "log"
 enabled = true
 
@@ -169,7 +172,10 @@ enabled = true
 name = "healthcheck"
 schedule = "*/5 * * * *"
 type = "script"
-command = "bun run checks/health.ts"
+program = "bun"
+args = ["run", "checks/health.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 output = "ntfy"
 enabled = true
 
@@ -190,7 +196,10 @@ schedule = "0 3 * * *"
 # timeout_ms is explicit because spawnScript's 60s default is far too short for
 # a 20-session harvest plus a week of pattern synthesis.
 type = "script"
-command = "bun run ~/.claude/LIFEOS/TOOLS/SessionHarvester.ts --recent 20 && bun run ~/.claude/LIFEOS/TOOLS/LearningPatternSynthesis.ts --week"
+program = "bun"
+args = ["run", "checks/memory-consolidation.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 timeout_ms = 600000
 output = "log"
 enabled = true
@@ -207,7 +216,10 @@ schedule = "45 3 * * *"
 # section above it, which is why re-running finds nothing. Runs at :45 so it
 # collects whatever memory-consolidation (0 3) just wrote.
 type = "script"
-command = "bun run ~/.claude/LIFEOS/TOOLS/ProposalGC.ts --auto"
+program = "bun"
+args = ["run", "${LIFEOS_DIR}/TOOLS/ProposalGC.ts", "--auto"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 output = "log"
 enabled = true
 
@@ -222,7 +234,10 @@ enabled = true
 name = "assistant-heartbeat"
 schedule = "*/30 * * * *"
 type = "script"
-command = "bun run Assistant/checks/heartbeat.ts"
+program = "bun"
+args = ["run", "Assistant/checks/heartbeat.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 output = "log"
 enabled = false
 
@@ -230,7 +245,10 @@ enabled = false
 name = "assistant-tasks"
 schedule = "* * * * *"
 type = "script"
-command = "bun run Assistant/checks/tasks.ts"
+program = "bun"
+args = ["run", "Assistant/checks/tasks.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 output = "log"
 enabled = false
 
@@ -238,7 +256,10 @@ enabled = false
 name = "assistant-diary"
 schedule = "0 23 * * *"
 type = "script"
-command = "bun run Assistant/checks/diary.ts"
+program = "bun"
+args = ["run", "Assistant/checks/diary.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 output = "log"
 enabled = false
 
@@ -246,7 +267,10 @@ enabled = false
 name = "assistant-growth"
 schedule = "0 4 * * 0"
 type = "script"
-command = "bun run Assistant/checks/growth.ts"
+program = "bun"
+args = ["run", "Assistant/checks/growth.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 output = "log"
 enabled = false
 
@@ -256,7 +280,10 @@ enabled = false
 name = "life-morning-brief"
 schedule = "0 7 * * *"
 type = "script"
-command = "bun run checks/life-morning-brief.ts"
+program = "bun"
+args = ["run", "checks/life-morning-brief.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 output = "log"
 enabled = true
 

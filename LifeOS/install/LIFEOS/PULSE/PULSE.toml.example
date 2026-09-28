@@ -25,3 +25,17 @@ enabled = true
 # Health check interval in seconds
 interval = 300
 # Add your custom checks in checks/
+
+# Scheduler jobs use an executable plus argument array so they run identically
+# without Bash on Windows. Legacy `command` remains supported on POSIX; Windows
+# requires `shell = "powershell"` for an intentional string command.
+[[job]]
+name = "healthcheck"
+schedule = "*/5 * * * *"
+type = "script"
+program = "bun"
+args = ["run", "checks/health.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
+output = "log"
+enabled = true

@@ -13,12 +13,13 @@ import { join } from "path"
 import { homedir } from "node:os";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir()
+const CONFIG_ROOT = process.env.CLAUDE_CONFIG_DIR || join(HOME, ".claude")
 const LOOKAHEAD_MS = 30 * 60 * 1000
 
 function loadEnv(): Record<string, string> {
   const env: Record<string, string> = {}
   try {
-    const content = readFileSync(join(HOME, ".claude", ".env"), "utf-8")
+    const content = readFileSync(join(CONFIG_ROOT, ".env"), "utf-8")
     for (const line of content.split("\n")) {
       const match = line.match(/^([^#=]+)=(.*)$/)
       if (match) {

@@ -161,7 +161,7 @@ function extractSlug(title: string): string | undefined {
 // issues; the workload is bounded and the files are small.
 function extractPrincipalGoal(slug: string | undefined): string | undefined {
   if (!slug) return undefined;
-  const isaPath = join(HOME, ".claude", "LIFEOS", "MEMORY", "WORK", slug, "ISA.md");
+  const isaPath = join(LIFEOS_DIR, "MEMORY", "WORK", slug, "ISA.md");
   if (!existsSync(isaPath)) return undefined;
   try {
     const content = readFileSync(isaPath, "utf-8");
@@ -335,7 +335,7 @@ function setupTemplate(reason: string): Response {
     instructions: [
       "Bind a PRIVATE GitHub repo by writing `LIFEOS/USER/WORK/work_repo.json`:\n`{ \"repo\": \"owner/repo\", \"privacy\": { \"verified_private\": true, \"verified_at\": \"1970-01-01T00:00:00Z\", \"visibility\": \"private\" } }`\nThe loader never trusts a hand-written attestation on its own — it re-runs `gh repo view --json visibility,isPrivate` and only enables the module if the repo is genuinely private, then writes back a fresh `verified_at`. If your install ships a work-tracking skill with a SetWorkRepo tool, use that instead; it writes the same file.",
       `Ensure the repo has these labels: Type:feature, Type:reminder, Type:research, Type:queue, Status:queued, Status:in-progress, Status:in-review, Status:blocked, Status:done, Priority:P0..P3, Property:internal, Agent:${getDAName()}, pai-sync.`,
-      "Restart Pulse so this module re-reads work_repo.json: `bun ~/.claude/LIFEOS/PULSE/manage.sh restart`.",
+      `Restart Pulse so this module re-reads work_repo.json: ${process.platform === "win32" ? "run PULSE/manage.ps1 restart" : "run PULSE/manage.sh restart"}.`,
       "Run an Algorithm session — the SessionEnd work-capture hook will open the first issue.",
     ],
     docs: "LIFEOS/DOCUMENTATION/Work/WorkSystem.md (see 'Capture surfaces')",

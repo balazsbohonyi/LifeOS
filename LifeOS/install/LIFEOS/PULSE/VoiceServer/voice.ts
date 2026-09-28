@@ -18,7 +18,8 @@ import { join } from "path"
 import { existsSync, readFileSync, rmSync } from "fs"
 import { log } from "../lib"
 import { disambiguateHomographs } from "../lib/homographs"
-import { homedir } from "node:os";
+import { tmpdir } from "node:os";
+import { findExecutable, resolveRuntimePaths } from "../../TOOLS/RuntimePaths.ts"
 
 // ── Public Config Interface ──
 
@@ -74,6 +75,7 @@ let pronunciationRules: CompiledRule[] = []
 let voiceConfig: LoadedVoiceConfig = { defaultVoiceId: "", voices: {}, voicesByVoiceId: {}, desktopNotifications: true }
 let defaultVoiceId = ""
 let initialized = false
+const RUNTIME_PATHS = resolveRuntimePaths()
 
 // ── Constants ──
 
@@ -167,8 +169,7 @@ function escapeRegex(str: string): string {
 }
 
 function loadPronunciations(customPath?: string): void {
-  const paiDir = join(homedir(), ".claude", "LIFEOS")
-  const userPronPath = customPath ?? join(paiDir, "USER", "PRINCIPAL", "PRONUNCIATIONS.json")
+  const userPronPath = customPath ?? join(RUNTIME_PATHS.userDir, "PRINCIPAL", "PRONUNCIATIONS.json")
 
   try {
     if (existsSync(userPronPath)) {
@@ -207,7 +208,7 @@ function applyPronunciations(text: string): string {
 // ── Voice Config from settings.json ──
 
 function loadVoiceConfigFromSettings(): LoadedVoiceConfig {
-  const settingsPath = join(homedir(), ".claude", "settings.json")
+  const settingsPath = join(RUNTIME_PATHS.configRoot, "settings.json")
 
   try {
     if (!existsSync(settingsPath)) {
@@ -384,6 +385,14 @@ function resolveAudioPlayer(): AudioPlayer | null {
   const candidates: Array<{ cmd: string; buildArgs: (file: string, volume: number) => string[] }> =
     process.platform === "darwin"
       ? [{ cmd: "afplay", buildArgs: (file, volume) => ["-v", volume.toString(), file] }]
+      : process.platform === "win32"
+        ? [{
+            cmd: process.env.LIFEOS_FFPLAY_PATH || "ffplay",
+            buildArgs: (file, volume) => [
+              "-nodisp", "-autoexit", "-loglevel", "quiet",
+              "-volume", String(scaleVolume(volume, 100)), file,
+            ],
+          }]
       : [
           {
             cmd: "ffplay",
@@ -413,7 +422,7 @@ function resolveAudioPlayer(): AudioPlayer | null {
         ]
 
   for (const c of candidates) {
-    const path = Bun.which(c.cmd)
+    const path = findExecutable(c.cmd)
     if (path) {
       resolvedPlayer = { path, buildArgs: c.buildArgs }
       return resolvedPlayer
@@ -440,10 +449,10 @@ async function playAudio(audioBuffer: ArrayBuffer, volume: number = FALLBACK_VOL
   if (!player) {
     const tried = process.platform === "darwin" ? "afplay" : "ffplay/mpg123/paplay/aplay"
     log("warn", `Voice: no audio player found (tried ${tried}) on ${process.platform} — skipping playback`)
-    return
+    throw new Error(`no audio player available on ${process.platform}`)
   }
 
-  const tempFile = `/tmp/voice-${Date.now()}.mp3`
+  const tempFile = join(tmpdir(), `lifeos-voice-${process.pid}-${Date.now()}.mp3`)
   await Bun.write(tempFile, audioBuffer)
 
   return new Promise((resolve, reject) => {
@@ -481,14 +490,24 @@ async function playAudio(audioBuffer: ArrayBuffer, volume: number = FALLBACK_VOL
   })
 }
 
-// ── macOS Desktop Notification ──
+// ── Desktop Notification ──
 
 async function showDesktopNotification(title: string, message: string): Promise<void> {
   if (!voiceConfig.desktopNotifications) return
-  // osascript is macOS-only; on Linux/WSL2 the spawn ENOENT's and floods journal
-  if (process.platform !== "darwin") return
+  if (process.platform !== "darwin" && process.platform !== "win32") return
 
   try {
+    if (process.platform === "win32") {
+      const powershell = findExecutable("powershell")
+      const helper = join(RUNTIME_PATHS.pulseDir, "WindowsToast.ps1")
+      if (!powershell || !existsSync(helper)) throw new Error("Windows toast helper is unavailable")
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn(powershell, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper, "-Title", title, "-Message", message])
+        proc.on("error", reject)
+        proc.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`toast helper exited ${code}`))))
+      })
+      return
+    }
     const escapedTitle = escapeForAppleScript(title)
     const escapedMessage = escapeForAppleScript(message)
     const script = `display notification "${escapedMessage}" with title "${escapedTitle}" sound name ""`
@@ -661,6 +680,7 @@ export function startVoice(config: VoiceConfig): void {
  * Health check for the voice subsystem.
  */
 export function voiceHealth(): Record<string, unknown> {
+  const player = resolveAudioPlayer()
   return {
     initialized,
     enabled: moduleConfig.enabled,
@@ -670,6 +690,9 @@ export function voiceHealth(): Record<string, unknown> {
     pronunciation_rules: pronunciationRules.length,
     configured_voices: Object.keys(voiceConfig.voices),
     desktop_notifications: voiceConfig.desktopNotifications,
+    playback_status: player ? "live" : "degraded",
+    playback_executable: player?.path ?? null,
+    playback_reason: player ? undefined : `no supported audio player found on ${process.platform}`,
   }
 }
 
@@ -768,7 +791,7 @@ export async function handleVoiceRequest(req: Request): Promise<Response | null>
       // /notify/personality honest with whatever the user last selected.
       let voiceId: string | null = null
       try {
-        const settingsFile = join(homedir(), ".claude", "settings.json")
+        const settingsFile = join(RUNTIME_PATHS.configRoot, "settings.json")
         const settings = JSON.parse(readFileSync(settingsFile, "utf-8"))
         const main = settings?.daidentity?.voices?.main
         const vid = (main?.voiceId || main?.VOICE_ID || main?.voice_id) as string | undefined

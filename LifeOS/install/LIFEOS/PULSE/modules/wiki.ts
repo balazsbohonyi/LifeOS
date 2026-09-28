@@ -36,13 +36,14 @@ import { homedir } from "node:os";
 // Path Construction
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir()
-const LIFEOS_DIR = join(HOME, ".claude", "LIFEOS")
+const CONFIG_ROOT = process.env.CLAUDE_CONFIG_DIR || join(HOME, ".claude")
+const LIFEOS_DIR = process.env.LIFEOS_DIR || join(CONFIG_ROOT, "LIFEOS")
 const DOCUMENTATION_DIR = join(LIFEOS_DIR, "DOCUMENTATION")
 const KNOWLEDGE_DIR = join(LIFEOS_DIR, "MEMORY", "KNOWLEDGE")
 const ALGORITHM_DIR = join(LIFEOS_DIR, "ALGORITHM")
-const SKILLS_DIR = join(HOME, ".claude", "skills")
-const HOOKS_DIR = join(HOME, ".claude", "hooks")
-const SETTINGS_PATH = join(HOME, ".claude", "settings.json")
+const SKILLS_DIR = join(CONFIG_ROOT, "skills")
+const HOOKS_DIR = join(CONFIG_ROOT, "hooks")
+const SETTINGS_PATH = join(CONFIG_ROOT, "settings.json")
 const ARBOL_WORKERS_DIR = join(LIFEOS_DIR, "USER", "CUSTOMIZATIONS", "ARBOL", "Workers")
 
 const SYSTEM_PROMPT_PATH = join(LIFEOS_DIR, "LIFEOS_SYSTEM_PROMPT.md")

@@ -1,0 +1,80 @@
+name: Pulse Windows
+
+on:
+  pull_request:
+    paths:
+      - "LifeOS/install/LIFEOS/PULSE/**"
+      - "LifeOS/install/LIFEOS/TOOLS/**"
+      - "LifeOS/Tools/**"
+      - ".github/workflows/pulse-windows.yml"
+  push:
+    branches: [main]
+    paths:
+      - "LifeOS/install/LIFEOS/PULSE/**"
+      - "LifeOS/install/LIFEOS/TOOLS/**"
+      - "LifeOS/Tools/**"
+      - ".github/workflows/pulse-windows.yml"
+
+jobs:
+  native-windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: powershell
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Unit tests
+        run: |
+          bun test `
+            LifeOS/install/LIFEOS/TOOLS/RuntimePaths.test.ts `
+            LifeOS/install/LIFEOS/PULSE/lib.scheduler.test.ts `
+            LifeOS/install/LIFEOS/PULSE/lib/capabilities.test.ts `
+            LifeOS/Tools/InstallEngine.windows.test.ts
+
+      - name: Native lifecycle acceptance
+        run: |
+          $ErrorActionPreference = "Stop"
+          $source = Resolve-Path "LifeOS/install/LIFEOS"
+          $root = Join-Path $env:RUNNER_TEMP "LifeOS Pulse CI Root"
+          $runtime = Join-Path $root "LIFEOS"
+          $taskPath = "\LifeOS-Test\"
+          $taskName = "Pulse-$env:GITHUB_RUN_ID"
+          $manager = Join-Path $runtime "PULSE/manage.ps1"
+          $shortcut = Join-Path $root "LifeOS Pulse CI.lnk"
+          New-Item -ItemType Directory -Path $root -Force | Out-Null
+          Copy-Item -LiteralPath $source -Destination $runtime -Recurse
+
+          try {
+            $install = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $manager install `
+              -ConfigRoot $root -BunPath (Get-Command bun.exe).Source -TaskPath $taskPath `
+              -TaskName $taskName -NotificationShortcut $shortcut -RestartDelaySeconds 1 -Json | ConvertFrom-Json
+            if (-not $install.ok -or -not $install.taskOwned -or -not $install.lockOwned) { throw "install ownership verification failed" }
+
+            $health = Invoke-RestMethod "http://127.0.0.1:31337/healthz" -TimeoutSec 5
+            if ($health.runtimeRoot -ne $runtime) { throw "health endpoint reported the wrong runtime root" }
+            $dashboard = Invoke-WebRequest "http://127.0.0.1:31337/" -UseBasicParsing -TimeoutSec 5
+            if ($dashboard.StatusCode -ne 200) { throw "dashboard was not served" }
+
+            $oldInstance = $health.instanceId
+            Stop-Process -Id ([int]$health.pid) -Force
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+              Start-Sleep -Milliseconds 500
+              try { $health = Invoke-RestMethod "http://127.0.0.1:31337/healthz" -TimeoutSec 2 } catch { $health = $null }
+            } while ((-not $health -or $health.instanceId -eq $oldInstance) -and (Get-Date) -lt $deadline)
+            if (-not $health -or $health.instanceId -eq $oldInstance) { throw "Pulse did not restart after a forced crash" }
+
+            $repair = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $manager repair `
+              -ConfigRoot $root -BunPath (Get-Command bun.exe).Source -TaskPath $taskPath `
+              -TaskName $taskName -NotificationShortcut $shortcut -RestartDelaySeconds 1 -Json | ConvertFrom-Json
+            if (-not $repair.ok -or -not $repair.taskOwned) { throw "idempotent repair failed" }
+          } finally {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $manager uninstall `
+              -ConfigRoot $root -TaskPath $taskPath -TaskName $taskName `
+              -NotificationShortcut $shortcut -Json | Out-Host
+          }

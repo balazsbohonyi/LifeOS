@@ -6,7 +6,8 @@ import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 import { homedir } from "node:os";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir();
-const EDITS_LOG = resolve(HOME, ".claude", "LIFEOS", "MEMORY", "OBSERVABILITY", "pulse-edits.jsonl");
+const LIFEOS_DIR = process.env.LIFEOS_DIR || resolve(process.env.CLAUDE_CONFIG_DIR || resolve(HOME, ".claude"), "LIFEOS");
+const EDITS_LOG = resolve(LIFEOS_DIR, "MEMORY", "OBSERVABILITY", "pulse-edits.jsonl");
 const PULSE_EDIT_GRACE_MS = 5_000;
 
 export interface WatcherOptions {

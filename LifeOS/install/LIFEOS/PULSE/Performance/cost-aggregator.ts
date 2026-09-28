@@ -15,8 +15,9 @@ import { existsSync, readFileSync, writeFileSync, appendFileSync, readdirSync, s
 import { homedir } from "node:os";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir()
-const LIFEOS_DIR = join(HOME, ".claude", "LIFEOS")
-const PROJECTS_DIR = join(HOME, ".claude", "projects")
+const CONFIG_ROOT = process.env.CLAUDE_CONFIG_DIR || join(HOME, ".claude")
+const LIFEOS_DIR = process.env.LIFEOS_DIR || join(CONFIG_ROOT, "LIFEOS")
+const PROJECTS_DIR = join(CONFIG_ROOT, "projects")
 const OUTPUT_FILE = join(LIFEOS_DIR, "MEMORY", "OBSERVABILITY", "session-costs.jsonl")
 const STATE_FILE = join(LIFEOS_DIR, "PULSE", "Performance", "aggregator-state.json")
 

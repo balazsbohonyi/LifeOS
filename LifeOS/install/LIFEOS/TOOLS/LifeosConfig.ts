@@ -19,7 +19,7 @@
 
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { homedir } from "node:os";
+import { resolveRuntimePaths } from "./RuntimePaths.ts";
 
 // Expand leading `~` (and `~/`) to the user's home directory. node:fs APIs do
 // not expand tildes, so any path returned from this loader must be absolute.
@@ -90,8 +90,9 @@ export interface LifeosConfig {
 
 // ─────────── Resolution ───────────
 
-const DEFAULT_HOME = process.env.HOME || homedir();
-const DEFAULT_CONFIG_PATH = resolve(DEFAULT_HOME, ".claude/LIFEOS/USER/CONFIG/LIFEOS_CONFIG.toml");
+const RUNTIME_PATHS = resolveRuntimePaths();
+const DEFAULT_HOME = RUNTIME_PATHS.home;
+const DEFAULT_CONFIG_PATH = RUNTIME_PATHS.configPath;
 
 let cache: { config: LifeosConfig; mtime: number; path: string } | null = null;
 
@@ -139,7 +140,7 @@ export function paiUserDir(): string {
   try {
     return loadLifeosConfig().paths.userDir;
   } catch {
-    return resolve(DEFAULT_HOME, ".claude/LIFEOS/USER");
+    return RUNTIME_PATHS.userDir;
   }
 }
 

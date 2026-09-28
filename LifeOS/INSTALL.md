@@ -128,10 +128,10 @@ LifeOS installs in **two layers**, and you present them that way.
 | **tooltips** | custom Claude Code spinner tips | optional |
 | **spinner verbs** | custom spinner verbs | optional |
 | **agents** | the named agent library | optional |
-| **Pulse** | the Life Dashboard — menu-bar app + `launchd` service on `:31337` | optional |
-| **worksweep / derivedsync** | background `launchd` jobs (work capture, derived-file sync) | optional |
+| **Pulse** | the Life Dashboard — native per-user service on `:31337` (plus a macOS-only menu-bar app) | optional |
+| **worksweep / derivedsync** | background jobs for work capture and derived-file sync | optional |
 
-Pulse, worksweep, and derivedsync install as **launchd** agents on macOS and as **systemd --user** units on Linux — their installers dispatch on platform, so offer them on both (Windows has neither: skip cleanly there). The macOS menu-bar app is genuinely macOS-only. Show your human this menu, take their picks, and deploy only those. The **Setup** workflow (step 9) drives the actual deployment of the chosen set and verifies each with real evidence (e.g. Pulse → `curl :31337/healthz` = 200). Everything ships in the payload; nothing activates without its matching yes.
+Pulse installs as a **launchd** agent on macOS, a **systemd --user** unit on Linux, and a per-user **Task Scheduler** task at `\LifeOS\Pulse` on Windows. Offer Pulse on all three platforms. The macOS menu-bar app remains macOS-only, while Windows reports it as unsupported without disabling the dashboard. Worksweep and derivedsync remain unsupported on Windows v1. The **Setup** workflow (step 9) deploys the chosen set and verifies Pulse through `http://127.0.0.1:31337/healthz`, including matching runtime ownership. Everything ships in the payload; nothing activates without its matching yes.
 
 ### 8.5 Capability check — probe what doctrine assumes (Doctor)
 

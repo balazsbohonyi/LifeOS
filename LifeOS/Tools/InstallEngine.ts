@@ -12,10 +12,11 @@
  * from this one sibling module (flat 2-level skill structure forbids a lib/ dir).
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, release } from "node:os";
 import { join, resolve } from "node:path";
+import { findExecutable, type RuntimePathEnvironment } from "../install/LIFEOS/TOOLS/RuntimePaths.ts";
 
 // ── Types (inlined — the skill ships without the engine's types.ts) ──
 
@@ -34,7 +35,7 @@ export interface ToolInfo {
   path?: string;
 }
 
-export type Harness = "claude-code" | "opencode" | "hermes" | "cursor" | "openclaw" | "unknown";
+export type Harness = "codex" | "claude-code" | "opencode" | "hermes" | "cursor" | "openclaw" | "unknown";
 
 export interface HarnessInfo {
   name: Harness;
@@ -103,15 +104,19 @@ export function detectOS(): OsInfo {
     version = tryExec("uname -r") || "";
   } else {
     name = "Windows";
-    version = tryExec("ver") || "";
+    version = release();
   }
   return { platform, arch, version, name };
 }
 
 export function detectTool(name: string, versionCmd: string): ToolInfo {
-  const path = tryExec(`command -v ${name}`);
+  const path = findExecutable(name);
   if (!path) return { installed: false };
-  const out = tryExec(versionCmd);
+  let out: string | null = null;
+  try {
+    const parts = versionCmd.trim().split(/\s+/u);
+    out = execFileSync(path, parts.slice(1), { encoding: "utf8", timeout: 5000, windowsHide: true }).trim();
+  } catch { /* a present tool with an unreadable version is still installed */ }
   const m = out?.match(/(\d+\.\d+[.\d]*)/);
   return { installed: true, version: m?.[1] || out || undefined, path };
 }
@@ -125,21 +130,30 @@ export function detectTool(name: string, versionCmd: string): ToolInfo {
  * claude CLI must not out-rank a live OpenCode install. Anything short of a
  * binary match is reported as confidence "assumed", never as fact.
  */
-export function detectHarness(home: string): HarnessInfo {
+export function detectHarness(
+  home: string,
+  env: RuntimePathEnvironment = process.env,
+  executableFinder: typeof findExecutable = findExecutable,
+): HarnessInfo {
   const candidates: Array<{ name: Harness; root: string; skills: string; bin: string }> = [
-    { name: "claude-code", root: process.env.CLAUDE_CONFIG_DIR || join(home, ".claude"), skills: "skills", bin: "claude" },
-    { name: "opencode", root: process.env.OPENCODE_CONFIG_DIR || join(home, ".config", "opencode"), skills: "skills", bin: "opencode" },
+    { name: "codex", root: env.CODEX_HOME || join(home, ".codex"), skills: "skills", bin: "codex" },
+    { name: "claude-code", root: env.CLAUDE_CONFIG_DIR || join(home, ".claude"), skills: "skills", bin: "claude" },
+    { name: "opencode", root: env.OPENCODE_CONFIG_DIR || join(home, ".config", "opencode"), skills: "skills", bin: "opencode" },
     { name: "hermes", root: join(home, ".hermes"), skills: "skills", bin: "hermes" },
     { name: "cursor", root: join(home, ".cursor"), skills: "skills", bin: "cursor" },
     { name: "openclaw", root: join(home, ".openclaw"), skills: "skills", bin: "openclaw" },
   ];
-  const hasBin = (c: (typeof candidates)[number]) => !!tryExec(`command -v ${c.bin}`);
+  const hasBin = (c: (typeof candidates)[number]) => Boolean(executableFinder(c.bin, { env }));
   const info = (c: (typeof candidates)[number], confidence: HarnessInfo["confidence"]): HarnessInfo => ({
     name: c.name,
     configRoot: c.root,
     skillsDir: join(c.root, c.skills),
     confidence,
   });
+  const codex = candidates[0];
+  if (env.CODEX_HOME || env.CODEX_THREAD_ID || env.CODEX_SESSION_ID || env.CODEX_SANDBOX) {
+    return info(codex, "detected");
+  }
   for (const c of candidates) {
     if (existsSync(c.root) && hasBin(c)) return info(c, "detected");
   }
@@ -175,8 +189,11 @@ export function detectEnv(): EnvDetection {
   const claudeMdPath = join(configRoot, "CLAUDE.md");
   const ssh = !!(process.env.SSH_CONNECTION || process.env.SSH_TTY || process.env.SSH_CLIENT);
   // GUI session: macOS always has one locally; Linux needs DISPLAY/WAYLAND and not pure-SSH.
-  const display =
-    os.platform === "darwin" ? !ssh : !!(process.env.DISPLAY || process.env.WAYLAND_DISPLAY) && !ssh;
+  const display = os.platform === "darwin"
+    ? !ssh
+    : os.platform === "windows"
+      ? !ssh && Boolean(process.env.SESSIONNAME || process.env.USERNAME || process.env.USERPROFILE)
+      : !!(process.env.DISPLAY || process.env.WAYLAND_DISPLAY) && !ssh;
 
   return {
     os,

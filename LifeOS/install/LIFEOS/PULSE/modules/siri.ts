@@ -23,7 +23,7 @@ import { loadRemoteMcpServers, mcpStatusPromptLine } from "../lib/mcp-allowlist"
 import { homedir } from "node:os";
 import { getDAName, getPrincipalName } from "../../../hooks/lib/identity";
 
-const CWD = `${homedir()}/.claude`
+const CWD = process.env.CLAUDE_CONFIG_DIR || `${homedir()}/.claude`
 const IDLE_TIMEOUT_MS = 60 * 60 * 1000 // 60 min idle gap resets the SDK thread
 const SDK_TIMEOUT_MS = 50_000 // Shortcuts' Get Contents of URL times out ~60s; stay under it
 const MAX_TURNS = 10 // speed over depth — this is a spoken exchange, not a work session

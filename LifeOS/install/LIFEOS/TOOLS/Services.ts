@@ -25,14 +25,17 @@
  *
  * ported from public PR #1705, @takanorinishida
  */
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { findExecutable, resolveRuntimePaths } from "./RuntimePaths.ts";
 
 const IS_LINUX = process.platform === "linux";
-const HOME = homedir();
-const CLAUDE = join(HOME, ".claude");
-const LIFEOS = join(CLAUDE, "LIFEOS");
+const IS_WINDOWS = process.platform === "win32";
+const RUNTIME_PATHS = resolveRuntimePaths();
+const HOME = RUNTIME_PATHS.home;
+const CLAUDE = RUNTIME_PATHS.configRoot;
+const LIFEOS = RUNTIME_PATHS.lifeosDir;
 const TOOLS = join(LIFEOS, "TOOLS");
 const PULSE = join(LIFEOS, "PULSE");
 const LAUNCH_AGENTS = join(HOME, "Library", "LaunchAgents");
@@ -193,6 +196,14 @@ function loadedLabelsLinux(): Set<string> {
 }
 
 export function loadedLabels(): Set<string> {
+  if (IS_WINDOWS) {
+    const labels = new Set<string>();
+    try {
+      execFileSync("schtasks.exe", ["/Query", "/TN", "\\LifeOS\\Pulse"], { stdio: "ignore", windowsHide: true });
+      labels.add("com.lifeos.pulse");
+    } catch { /* task is not registered */ }
+    return labels;
+  }
   return IS_LINUX ? loadedLabelsLinux() : loadedLabelsDarwin();
 }
 
@@ -240,6 +251,12 @@ function findPlistLinux(label: string): { path: string; installed: boolean } | n
 }
 
 export function findPlist(label: string): { path: string; installed: boolean } | null {
+  if (IS_WINDOWS) {
+    if (label !== "com.lifeos.pulse") return null;
+    const manager = join(PULSE, "manage.ps1");
+    if (!existsSync(manager)) return null;
+    return { path: manager, installed: loadedLabels().has(label) };
+  }
   return IS_LINUX ? findPlistLinux(label) : findPlistDarwin(label);
 }
 
@@ -275,7 +292,25 @@ function cadenceOfLinux(unitPath: string): string {
 }
 
 export function cadenceOf(unitPath: string): string {
+  if (IS_WINDOWS) return "at logon";
   return IS_LINUX ? cadenceOfLinux(unitPath) : cadenceOfDarwin(unitPath);
+}
+
+function runWindowsPulse(command: "install" | "uninstall"): { code: number; out: string } {
+  const powershell = findExecutable("powershell") ?? "powershell.exe";
+  const manager = join(PULSE, "manage.ps1");
+  const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", manager, command, "-Json", "-ConfigRoot", CLAUDE];
+  if (command === "install") {
+    const bun = findExecutable("bun");
+    if (!bun) return { code: 1, out: "Bun executable not found" };
+    args.push("-BunPath", bun);
+  }
+  try {
+    const out = execFileSync(powershell, args, { encoding: "utf8", windowsHide: true, timeout: 120_000 });
+    return { code: 0, out: out.trim() };
+  } catch (err: any) {
+    return { code: typeof err?.status === "number" ? err.status : 1, out: String(err?.stdout || err?.stderr || err?.message || err).trim() };
+  }
 }
 
 // CLI dispatch runs only when invoked directly. Pulse's `scheduled` module
@@ -301,12 +336,13 @@ if (cmd === "status" || cmd === "list") {
     console.log(`\n  ── ${cat} ──`);
     for (const s of rows) {
       const pl = findPlist(s.label);
-      const state = loaded.has(s.label) ? "● running" : pl?.installed ? "○ installed" : pl ? "· available" : "✗ missing";
+      const windowsUnsupported = IS_WINDOWS && s.label !== "com.lifeos.pulse";
+      const state = windowsUnsupported ? "— unsupported" : loaded.has(s.label) ? "● running" : pl?.installed ? "○ installed" : pl ? "· available" : "✗ missing";
       const cad = pl ? cadenceOf(pl.path) : "—";
       console.log("  " + state.padEnd(13) + cad.padEnd(16) + `${s.title}  (${s.label})`);
     }
   }
-  const missingCore = REGISTRY.filter((s) => !s.optIn && !loaded.has(s.label));
+  const missingCore = REGISTRY.filter((s) => !s.optIn && !loaded.has(s.label) && (!IS_WINDOWS || s.label === "com.lifeos.pulse"));
   if (missingCore.length) console.log(`\n  ⚠️ core not running: ${missingCore.map((s) => s.label).join(", ")}`);
 } else if (cmd === "doc") {
   console.log("| Service | Category | Cadence | Opt-in | Purpose | Install |");
@@ -338,6 +374,18 @@ if (cmd === "status" || cmd === "list") {
   };
   let failed = 0, skipped = 0;
   for (const s of targets) {
+    if (IS_WINDOWS) {
+      process.stdout.write(`  ${s.label} … `);
+      if (s.label !== "com.lifeos.pulse") {
+        console.log("⏭  unsupported on Windows v1");
+        skipped++;
+        continue;
+      }
+      const r = runWindowsPulse("install");
+      if (r.code === 0) console.log("✅");
+      else { console.log(`⚠️ (${r.out.split("\n").pop()})`); failed++; }
+      continue;
+    }
     const script = scriptOf(s.install);
     if (script && script.startsWith("/") && !existsSync(script)) {
       console.log(`  ${s.label} … ⏭  skipped (installer not present in this install: ${script.replace(HOME, "~")})`);
@@ -357,6 +405,16 @@ if (cmd === "status" || cmd === "list") {
 } else if (cmd === "uninstall") {
   if (!onlyArg) { console.error("uninstall requires --only <labels> (refusing to remove everything at once)"); process.exit(1); }
   for (const s of REGISTRY.filter(pick)) {
+    if (IS_WINDOWS) {
+      process.stdout.write(`  ${s.label} … `);
+      if (s.label !== "com.lifeos.pulse") {
+        console.log("⏭  unsupported on Windows v1");
+        continue;
+      }
+      const r = runWindowsPulse("uninstall");
+      console.log(r.code === 0 ? "🧹" : `⚠️ (${r.out.split("\n").pop()})`);
+      continue;
+    }
     // The DEFAULT uninstall is platform-dispatched here — unlike install, which
     // delegates to each service's own platform-aware Install*.ts. Only 2 of the
     // registry entries define an explicit `uninstall:`, so without this branch

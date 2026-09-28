@@ -6,8 +6,9 @@ import { sha256Hex } from "../lib/cache";
 import { homedir } from "node:os";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir();
-const USER_ROOT = resolve(HOME, ".claude", "LIFEOS", "USER");
-const EDITS_LOG = resolve(HOME, ".claude", "LIFEOS", "MEMORY", "OBSERVABILITY", "pulse-edits.jsonl");
+const LIFEOS_ROOT = resolve(process.env.LIFEOS_DIR || join(process.env.CLAUDE_CONFIG_DIR || resolve(HOME, ".claude"), "LIFEOS"));
+const USER_ROOT = resolve(LIFEOS_ROOT, "USER");
+const EDITS_LOG = resolve(LIFEOS_ROOT, "MEMORY", "OBSERVABILITY", "pulse-edits.jsonl");
 const CONTAINMENT_PREFIX_DENY = ["MEMORY/PULSE_DATA", "MEMORY/OBSERVABILITY"];
 
 export interface EditRequest {
@@ -33,7 +34,7 @@ function isInUserTree(absPath: string): boolean {
 }
 
 function isContainmentPath(absPath: string): boolean {
-  const rel = absPath.replace(resolve(HOME, ".claude", "LIFEOS") + "/", "");
+  const rel = absPath.replace(LIFEOS_ROOT + "/", "").replace(LIFEOS_ROOT + "\\", "");
   return CONTAINMENT_PREFIX_DENY.some((p) => rel.startsWith(p));
 }
 

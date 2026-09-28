@@ -1,56 +1,81 @@
-# LifeOS Pulse — Windows launcher (idempotent, hidden).
-# Ported from public issue #1733, @umair-a11y (pattern verified on the
-# contributor's Windows 11 install; PATH fix from their follow-up comment).
-#
-# Windows counterpart to the launchd/systemd paths in manage.sh. Registered as a
-# logon-triggered scheduled task by manage.ps1; safe to run by hand.
+# LifeOS Pulse — foreground Windows Task Scheduler entry point.
+
+param(
+    [string]$ConfigRoot,
+    [string]$BunPath,
+    [int]$RestartDelaySeconds = 60,
+    [int]$RestartCount = 3
+)
 
 $ErrorActionPreference = "Stop"
-
 $pulseDir = $PSScriptRoot
-$bun = Join-Path $env:USERPROFILE ".bun\bin\bun.exe"
+$lifeosDir = Split-Path -Parent $pulseDir
+if (-not $ConfigRoot) { $ConfigRoot = Split-Path -Parent $lifeosDir }
 
-# Already up? Task Scheduler retries on failure and the user may also start Pulse
-# by hand, so a second instance must not fight the first for :31337. Probe a
-# Pulse-SPECIFIC endpoint: /healthz returns a JSON body carrying a "status" field
-# (HTTP 200 healthy, 503 degraded — both mean Pulse already owns the port). A bare
-# 200 from some unrelated process that grabbed :31337 must NOT read as "Pulse up".
-function Test-PulseUp {
-    try {
-        $r = Invoke-WebRequest -Uri "http://localhost:31337/healthz" -UseBasicParsing -TimeoutSec 2
-        return ($r.Content -match '"status"')
-    } catch {
-        # PowerShell throws on non-2xx; a 503-degraded Pulse still owns the port,
-        # so inspect the error response body for the same Pulse marker.
-        try {
-            $resp = $_.Exception.Response
-            if ($resp) {
-                $reader = New-Object System.IO.StreamReader($resp.GetResponseStream())
-                return ($reader.ReadToEnd() -match '"status"')
-            }
-        } catch { }
-        return $false
+function Resolve-BunPath {
+    param([string]$Requested)
+    $candidates = @(
+        $Requested,
+        $env:LIFEOS_BUN_PATH,
+        (Join-Path $env:USERPROFILE ".bun\bin\bun.exe"),
+        (Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Links\bun.exe"),
+        (Join-Path $env:LOCALAPPDATA "bun\bin\bun.exe")
+    )
+    try { $candidates += (Get-Command bun.exe -ErrorAction Stop).Source } catch { }
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
     }
-}
-if (Test-PulseUp) { exit 0 }
-
-if (-not (Test-Path $bun)) {
-    Write-Error "bun not found at $bun — install bun, or edit this script's `$bun path."
-    exit 1
+    throw "Bun was not found. Install Bun or pass -BunPath to manage.ps1."
 }
 
-# HOME is unset on Windows; pulse.ts and the tools it spawns resolve paths from it.
-if (-not $env:HOME) { $env:HOME = $env:USERPROFILE }
+$bun = Resolve-BunPath $BunPath
+$env:HOME = $env:USERPROFILE
+$env:CLAUDE_CONFIG_DIR = $ConfigRoot
+$env:LIFEOS_DIR = $lifeosDir
+$env:LIFEOS_CONFIG_PATH = Join-Path $lifeosDir "USER\CONFIG\LIFEOS_CONFIG.toml"
+$env:PULSE_DIR = $pulseDir
+$env:LIFEOS_BUN_PATH = $bun
 
-# Task Scheduler sessions don't inherit the user's PATH additions, so Pulse boots
-# but its cron and voice subsystems die on `bun: command not found`. Git's usr\bin
-# supplies the POSIX shell the hooks shell out to. Process-scoped only.
-#
-# bun's dir goes FIRST (Pulse needs `bun`), but Git's usr\bin is APPENDED, not
-# prepended: it ships POSIX find.exe/sort.exe that otherwise shadow Windows'
-# System32 versions for Pulse and every child it spawns, breaking any child that
-# expects the Windows tools. Appending keeps System32 ahead of Git's POSIX shims
-# while still making the shims available as a last resort for the hooks.
-$env:PATH = "$(Join-Path $env:USERPROFILE '.bun\bin');$env:PATH;C:\Program Files\Git\usr\bin"
+$pathParts = New-Object System.Collections.Generic.List[string]
+$pathParts.Add((Split-Path -Parent $bun))
+try {
+    $ffplay = (Get-Command ffplay.exe -ErrorAction Stop).Source
+    $env:LIFEOS_FFPLAY_PATH = $ffplay
+    $pathParts.Add((Split-Path -Parent $ffplay))
+} catch { }
+$pathParts.Add($env:PATH)
+$env:PATH = ($pathParts | Where-Object { $_ } | Select-Object -Unique) -join ";"
 
-Start-Process -FilePath $bun -ArgumentList "run", "pulse.ts" -WorkingDirectory $pulseDir -WindowStyle Hidden
+$logDir = Join-Path $pulseDir "logs"
+New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+$stdoutLog = Join-Path $logDir "pulse-windows.log"
+$stderrLog = Join-Path $logDir "pulse-windows-error.log"
+
+Push-Location $pulseDir
+try {
+    # Stay in the foreground so Task Scheduler owns the actual lifetime.
+    # Windows PowerShell 5 promotes native stderr to an ErrorRecord when `*>>`
+    # is used under Stop-on-error, terminating an otherwise healthy daemon.
+    # Keep streams separate and preserve Bun's real exit code.
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $exitCode = 1
+    for ($attempt = 0; $attempt -le $RestartCount; $attempt++) {
+        & $bun run pulse.ts 1>> $stdoutLog 2>> $stderrLog
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -eq 0) { break }
+        if ($attempt -lt $RestartCount) {
+            "$(Get-Date -Format o) Pulse exited $exitCode; restarting in $RestartDelaySeconds seconds (attempt $($attempt + 1)/$RestartCount)" | Add-Content -LiteralPath $stderrLog
+            Start-Sleep -Seconds $RestartDelaySeconds
+        }
+    }
+    $ErrorActionPreference = $previousPreference
+    exit $exitCode
+} catch {
+    $_ | Out-String | Add-Content -LiteralPath $stderrLog
+    throw
+} finally {
+    Pop-Location
+}

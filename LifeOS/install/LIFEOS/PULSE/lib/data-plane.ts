@@ -6,7 +6,8 @@ import type { PageData, PageMeta, Provenance } from "../Schema/PulseSchema";
 import { homedir } from "node:os";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir();
-export const PULSE_DATA_DIR = resolve(HOME, ".claude", "LIFEOS", "MEMORY", "PULSE_DATA");
+const LIFEOS_DIR = process.env.LIFEOS_DIR || resolve(process.env.CLAUDE_CONFIG_DIR || resolve(HOME, ".claude"), "LIFEOS");
+export const PULSE_DATA_DIR = resolve(LIFEOS_DIR, "MEMORY", "PULSE_DATA");
 
 export interface DataPlaneFile {
   schemaVersion: string;

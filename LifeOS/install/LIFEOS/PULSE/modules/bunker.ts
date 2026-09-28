@@ -15,14 +15,17 @@
 import { join } from "path";
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "node:os";
+import { findExecutable } from "../../TOOLS/RuntimePaths.ts";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir();
+const CONFIG_ROOT = process.env.CLAUDE_CONFIG_DIR || join(HOME, ".claude");
+const LIFEOS_DIR = process.env.LIFEOS_DIR || join(CONFIG_ROOT, "LIFEOS");
 const MODULE = "bunker";
 // Bunker CODE folded under Pulse (data/code separation); DATA (shots) lives in
 // the USER config tree, so shot images are read from there, never from BUNKER_DIR.
-const BUNKER_DIR = process.env.BUNKER_DIR || join(HOME, ".claude", "LIFEOS", "PULSE", "Bunker");
+const BUNKER_DIR = process.env.BUNKER_DIR || join(LIFEOS_DIR, "PULSE", "Bunker");
 const BUNKER_BIN = join(BUNKER_DIR, "bin", "bunker.ts");
-const BUNKER_SHOTS_DIR = join(HOME, ".config", "LIFEOS", "USER", "PULSE", "Bunker", "shots");
+const BUNKER_SHOTS_DIR = join(LIFEOS_DIR, "USER", "PULSE", "Bunker", "shots");
 
 interface State {
   running: boolean;
@@ -48,7 +51,9 @@ async function refresh(): Promise<{ ok: boolean; reason?: string }> {
   if (refreshInFlight) return { ok: false, reason: "refresh already in flight" };
   refreshInFlight = true;
   try {
-    const proc = Bun.spawn(["bun", BUNKER_BIN, "data"], { stdout: "pipe", stderr: "pipe" });
+    const bun = findExecutable("bun");
+    if (!bun) return { ok: false, reason: "Bun executable not found" };
+    const proc = Bun.spawn([bun, BUNKER_BIN, "data"], { stdout: "pipe", stderr: "pipe" });
     const timer = setTimeout(() => { try { proc.kill(); } catch { /* already gone */ } }, REFRESH_TIMEOUT_MS);
     const [out, errTxt, code] = await Promise.all([
       new Response(proc.stdout).text(),
@@ -302,7 +307,7 @@ function cfCreds(): { acct: string; token: string } | null {
   let token = process.env.CLOUDFLARE_API_TOKEN;
   if (!acct || !token) {
     try {
-      const env = readFileSync(join(HOME, ".claude", ".env"), "utf8");
+      const env = readFileSync(join(CONFIG_ROOT, ".env"), "utf8");
       acct ||= env.match(/^CLOUDFLARE_ACCOUNT_ID=["']?([^"'\n]+)/m)?.[1];
       token ||= env.match(/^CLOUDFLARE_API_TOKEN=["']?([^"'\n]+)/m)?.[1];
     } catch { /* no env file */ }

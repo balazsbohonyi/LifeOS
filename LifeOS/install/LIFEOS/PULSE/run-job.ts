@@ -3,11 +3,17 @@
  * Manually run a specific Pulse job by name.
  * Usage: bun run run-job.ts <job-name>
  */
-import { join } from "path"
 import { readFileSync } from "fs"
+import { resolveRuntimePaths } from "../TOOLS/RuntimePaths.ts"
 
 // Load .env
-const envPath = join(homedir(), ".claude", ".env")
+const RUNTIME_PATHS = resolveRuntimePaths()
+process.env.HOME ||= RUNTIME_PATHS.home
+process.env.LIFEOS_DIR ||= RUNTIME_PATHS.lifeosDir
+process.env.CLAUDE_CONFIG_DIR ||= RUNTIME_PATHS.configRoot
+process.env.LIFEOS_CONFIG_PATH ||= RUNTIME_PATHS.configPath
+process.env.PULSE_DIR ||= RUNTIME_PATHS.pulseDir
+const envPath = RUNTIME_PATHS.envPath
 try {
   const envContent = readFileSync(envPath, "utf-8")
   for (const line of envContent.split("\n")) {
@@ -23,8 +29,7 @@ try {
   }
 } catch {}
 
-import { loadConfig, spawnClaude, spawnScript, dispatch, isSentinel, log } from "./lib"
-import { homedir } from "node:os";
+import { loadConfig, spawnClaude, runScriptJob, dispatch, isSentinel, log } from "./lib"
 
 const jobName = process.argv[2]
 if (!jobName) {
@@ -32,7 +37,7 @@ if (!jobName) {
   process.exit(1)
 }
 
-const PULSE_DIR = join(homedir(), ".claude", "LIFEOS", "PULSE")
+const PULSE_DIR = RUNTIME_PATHS.pulseDir
 const config = await loadConfig(PULSE_DIR)
 const job = config.jobs.find((j) => j.name === jobName)
 if (!job) {
@@ -47,7 +52,7 @@ let output: string
 if (job.type === "claude") {
   output = await spawnClaude(job.prompt!, { model: job.model ?? "sonnet" })
 } else {
-  output = await spawnScript(job.command!)
+  output = await runScriptJob(job, PULSE_DIR)
 }
 
 const durationMs = Date.now() - start

@@ -38,6 +38,7 @@ import { atomicWriteText } from "./lib/atomic-write";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { copyMissing, detectDevTree } from "./InstallEngine";
+import { findExecutable } from "../install/LIFEOS/TOOLS/RuntimePaths.ts";
 
 // Enhancement components are the à-la-carte half of setup. The "LifeOS Core"
 // (skills + system prompt + base settings + CLAUDE.md) is installed by Setup's
@@ -335,12 +336,17 @@ function deployViaServices(component: LaunchdComponent, ctx: Ctx): ComponentResu
   }
   r.ready = true;
 
+  if (process.platform === "win32" && component !== "pulse") {
+    r.blockers.push(`${component} is unsupported on Windows v1`);
+    return r;
+  }
+
   // Build the label — Services.ts accepts short form (pulse) or full (com.lifeos.pulse)
   const label = component.startsWith("com.lifeos.") ? component : `com.lifeos.${component}`;
 
   if (!ctx.apply) {
     if (!av.inLive) r.actions.push(`stage TOOLS from payload → ${join(ctx.lifeosDir, "TOOLS")}`);
-    r.actions.push(`bun ${servicesTs.replace(ctx.home, "~")} install --only ${component} --yes`);
+    r.actions.push(`${ctx.bun} ${servicesTs.replace(ctx.home, "~")} install --only ${component} --yes`);
     return r;
   }
 
@@ -351,15 +357,28 @@ function deployViaServices(component: LaunchdComponent, ctx: Ctx): ComponentResu
       return r;
     }
     // Delegate to Services.ts
-    const out = execFileSync("bun", [servicesTs, "install", "--only", component, "--yes"], {
+    const out = execFileSync(ctx.bun, [servicesTs, "install", "--only", component, "--yes"], {
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 120000, // some services take longer (e.g. Pulse waits for healthz)
       cwd: dirname(servicesTs),
+      env: {
+        ...process.env,
+        HOME: ctx.home,
+        CLAUDE_CONFIG_DIR: ctx.configRoot,
+        LIFEOS_DIR: ctx.lifeosDir,
+        LIFEOS_CONFIG_PATH: join(ctx.lifeosDir, "USER", "CONFIG", "LIFEOS_CONFIG.toml"),
+        LIFEOS_BUN_PATH: ctx.bun,
+      },
     }).toString();
     r.applied = true;
-    // Confirm the job actually loaded
-    const loaded = launchctl(["print", `gui/${uid()}/${label}`]).ok;
-    r.probe = { name: `${component}-loaded`, passed: loaded, detail: loaded ? `${label} loaded via Services.ts` : `Services.ts exit 0 but ${label} not loaded: ${out.trim().split("\n").slice(-1)[0]}` };
+    if (process.platform === "win32") {
+      // Services.ts delegates to manage.ps1, which verifies task ownership,
+      // /healthz, runtimeRoot, and instanceId before returning success.
+      r.probe = { name: `${component}-healthy`, passed: true, detail: `${label} installed and health-verified via Services.ts` };
+    } else {
+      const loaded = launchctl(["print", `gui/${uid()}/${label}`]).ok;
+      r.probe = { name: `${component}-loaded`, passed: loaded, detail: loaded ? `${label} loaded via Services.ts` : `Services.ts exit 0 but ${label} not loaded: ${out.trim().split("\n").slice(-1)[0]}` };
+    }
   } catch (err) {
     r.error = err instanceof Error ? err.message : String(err);
   }
@@ -434,7 +453,7 @@ function main(): void {
     // launchd runs the plist with a minimal PATH, so ProgramArguments[0] must be an
     // absolute bun path. Prefer the interpreter running this installer; fall back to
     // the standard bun install location.
-    bun: /\/bun$/.test(process.execPath) ? process.execPath : join(home, ".bun", "bin", "bun"),
+    bun: findExecutable("bun") ?? join(home, ".bun", "bin", process.platform === "win32" ? "bun.exe" : "bun"),
     launchAgents: join(home, "Library", "LaunchAgents"),
     apply,
   };

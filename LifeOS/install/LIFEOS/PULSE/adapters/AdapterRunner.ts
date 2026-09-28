@@ -13,7 +13,8 @@ import { modelToLevel } from "./model-level";
 import { homedir } from "node:os";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir();
-const OBSERVABILITY_DIR = resolve(HOME, ".claude", "LIFEOS", "MEMORY", "OBSERVABILITY");
+const LIFEOS_DIR = process.env.LIFEOS_DIR || resolve(process.env.CLAUDE_CONFIG_DIR || resolve(HOME, ".claude"), "LIFEOS");
+const OBSERVABILITY_DIR = resolve(LIFEOS_DIR, "MEMORY", "OBSERVABILITY");
 const RUNS_LOG = join(OBSERVABILITY_DIR, "adapter-runs.jsonl");
 
 const ADAPTER_TIMEOUT_MS = 120_000;

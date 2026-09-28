@@ -6,12 +6,12 @@
  */
 
 import { parse } from "smol-toml"
-import { join } from "path"
+import { isAbsolute, join, resolve } from "path"
 import { existsSync } from "fs"
 import { rename } from "fs/promises"
 import { modelForEffort } from "../TOOLS/models.ts"
+import { findExecutable, resolveRuntimePaths } from "../TOOLS/RuntimePaths.ts"
 import { PULSE_BASE } from "./endpoint"
-import { homedir } from "node:os";
 
 export { PULSE_BASE }
 
@@ -21,11 +21,18 @@ export type OutputTarget = "voice" | "ntfy" | "email" | "log"
 
 export type JobSource = "system" | "user"
 
+export type JobPlatform = "darwin" | "linux" | "windows"
+
 export interface Job {
   name: string
   schedule: string
   type: "script" | "claude"
   command?: string
+  program?: string
+  args?: string[]
+  working_dir?: string
+  platforms?: JobPlatform[]
+  shell?: "powershell" | "bash"
   prompt?: string
   model?: string
   output: OutputTarget | OutputTarget[]
@@ -75,10 +82,9 @@ export interface DaemonConfig {
 // written here is automatically stripped from shadow releases. That's the
 // structural privacy lever — no separate scrub policy needed.
 
-export const USER_CRON_PATH = join(
-  homedir(),
-  ".claude", "LIFEOS", "USER", "CONFIG", "PULSE.user.toml",
-)
+const RUNTIME_PATHS = resolveRuntimePaths()
+
+export const USER_CRON_PATH = join(RUNTIME_PATHS.userDir, "CONFIG", "PULSE.user.toml")
 
 export interface JobState {
   lastRun: number
@@ -161,6 +167,11 @@ function jobsFromParsed(parsed: Record<string, unknown>, source: JobSource): Job
     schedule: j.schedule as string,
     type: (j.type as "script" | "claude") ?? "script",
     command: j.command as string | undefined,
+    program: j.program as string | undefined,
+    args: Array.isArray(j.args) ? j.args.map(String) : undefined,
+    working_dir: j.working_dir as string | undefined,
+    platforms: Array.isArray(j.platforms) ? j.platforms.map(String) as JobPlatform[] : undefined,
+    shell: j.shell as "powershell" | "bash" | undefined,
     prompt: j.prompt as string | undefined,
     model: (j.model as string) ?? modelForEffort('medium'),
     output: (j.output ?? "log") as OutputTarget | OutputTarget[],
@@ -540,11 +551,76 @@ export function isSentinel(output: string): boolean {
 
 // ── Process Spawning ──
 
-// Resolve bash absolutely so cron-spawned children don't hit ENOENT when the
-// inherited PATH is sparse (observed on Linux when Pulse runs under a
-// minimal-env service manager). /bin/bash is the POSIX fallback — present on
-// macOS natively and on every mainstream Linux distro.
-const BASH_PATH = Bun.which("bash") ?? "/bin/bash"
+export class UnsupportedJobError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "UnsupportedJobError"
+  }
+}
+
+export function currentJobPlatform(platform: NodeJS.Platform = process.platform): JobPlatform {
+  return platform === "win32" ? "windows" : platform === "darwin" ? "darwin" : "linux"
+}
+
+export function jobUnsupportedReason(job: Job, platform: NodeJS.Platform = process.platform): string | undefined {
+  const current = currentJobPlatform(platform)
+  if (job.platforms?.length && !job.platforms.includes(current)) {
+    return `job supports ${job.platforms.join(", ")}; current platform is ${current}`
+  }
+  if (job.type === "script" && !job.program && job.command && platform === "win32" && job.shell !== "powershell") {
+    return "legacy string commands on Windows require shell = \"powershell\"; prefer program + args"
+  }
+  if (job.type === "script" && !job.program && !job.command) {
+    return "script job requires program or command"
+  }
+  return undefined
+}
+
+export interface ScriptInvocation {
+  argv: string[]
+  cwd: string
+}
+
+interface ResolveInvocationOptions {
+  platform?: NodeJS.Platform
+  processExecPath?: string
+  executableFinder?: typeof findExecutable
+}
+
+/** Convert a structured or legacy job into the exact argv passed to Bun.spawn. */
+export function resolveScriptInvocation(
+  job: Job,
+  daemonDir: string = RUNTIME_PATHS.pulseDir,
+  options: ResolveInvocationOptions = {},
+): ScriptInvocation {
+  const platform = options.platform ?? process.platform
+  const unsupported = jobUnsupportedReason(job, platform)
+  if (unsupported) throw new UnsupportedJobError(`${job.name}: ${unsupported}`)
+
+  const cwdValue = job.working_dir ?? daemonDir
+  const cwd = isAbsolute(cwdValue) ? cwdValue : resolve(daemonDir, cwdValue)
+  const finder = options.executableFinder ?? findExecutable
+
+  if (job.program) {
+    let executable: string | undefined
+    if (isAbsolute(job.program)) {
+      executable = existsSync(job.program) ? job.program : undefined
+    } else {
+      executable = finder(job.program, { platform, processExecPath: options.processExecPath })
+    }
+    if (!executable) throw new Error(`${job.name}: executable not found: ${job.program}`)
+    return { argv: [executable, ...(job.args ?? [])], cwd }
+  }
+
+  if (platform === "win32") {
+    const powershell = finder("powershell", { platform, processExecPath: options.processExecPath })
+    if (!powershell) throw new Error(`${job.name}: powershell executable not found`)
+    return { argv: [powershell, "-NoProfile", "-NonInteractive", "-Command", job.command!], cwd }
+  }
+
+  const bash = finder("bash", { platform, processExecPath: options.processExecPath }) ?? "/bin/bash"
+  return { argv: [bash, "-c", job.command!], cwd }
+}
 
 // Drain a child's pipes and await exit under a hard deadline (public issue
 // #1546, @jacobo-ortiz). A bare `await new Response(proc.stdout).text()` after
@@ -576,11 +652,11 @@ export async function collectProc(
   }
 }
 
-export async function spawnScript(command: string, timeoutMs = 60_000): Promise<string> {
-  const proc = Bun.spawn([BASH_PATH, "-c", command], {
+async function spawnInvocation(invocation: ScriptInvocation, timeoutMs: number): Promise<string> {
+  const proc = Bun.spawn(invocation.argv, {
     stdout: "pipe",
     stderr: "pipe",
-    cwd: join(homedir(), ".claude", "LIFEOS", "PULSE"),
+    cwd: invocation.cwd,
     env: { ...process.env },
   })
 
@@ -590,6 +666,27 @@ export async function spawnScript(command: string, timeoutMs = 60_000): Promise<
   if (exitCode !== 0) throw new Error(`Script exited ${exitCode}: ${stderr.slice(0, 200)}`)
 
   return stdout.trim()
+}
+
+export async function runScriptJob(job: Job, daemonDir: string = RUNTIME_PATHS.pulseDir): Promise<string> {
+  const invocation = resolveScriptInvocation(job, daemonDir)
+  return spawnInvocation(invocation, job.timeout_ms ?? 60_000)
+}
+
+/**
+ * Backward-compatible POSIX string-command entry point. New scheduler code
+ * should use runScriptJob() so Windows shell policy and structured argv apply.
+ */
+export async function spawnScript(command: string, timeoutMs = 60_000): Promise<string> {
+  const legacy: Job = {
+    name: "legacy-script",
+    schedule: "* * * * *",
+    type: "script",
+    command,
+    output: "log",
+    enabled: true,
+  }
+  return spawnInvocation(resolveScriptInvocation(legacy), timeoutMs)
 }
 
 export async function spawnClaude(prompt: string, opts: { model: string; timeoutMs?: number }): Promise<string> {
@@ -612,9 +709,9 @@ export async function spawnClaude(prompt: string, opts: { model: string; timeout
     "--setting-sources", "",
     "--system-prompt", "",
   ]
-  const claudePath = Bun.which("claude") ?? join(homedir(), ".local", "bin", "claude")
+  const claudePath = findExecutable("claude") ?? join(RUNTIME_PATHS.home, ".local", "bin", "claude")
 
-  const env: Record<string, string> = { ...process.env, HOME: homedir() } as Record<string, string>
+  const env: Record<string, string> = { ...process.env, HOME: RUNTIME_PATHS.home } as Record<string, string>
   // Strip BOTH keys — Anthropic's precedence chain ranks ANTHROPIC_API_KEY and
   // ANTHROPIC_AUTH_TOKEN above CLAUDE_CODE_OAUTH_TOKEN, so either one in env
   // silently overrides OAuth. Mirrors LIFEOS/TOOLS/Inference.ts:116-117.

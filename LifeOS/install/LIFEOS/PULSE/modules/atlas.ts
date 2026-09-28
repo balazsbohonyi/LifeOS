@@ -172,7 +172,7 @@ export async function handleRequest(req: Request, pathname: string): Promise<Res
   }
   try {
     if (!existsSync(SNAPSHOT_PATH)) {
-      return Response.json({ available: false, error: "no snapshot — run: bun ~/.claude/LIFEOS/ATLAS/Atlas.ts sync" });
+      return Response.json({ available: false, error: "no snapshot — run: bun <configRoot>/LIFEOS/ATLAS/Atlas.ts sync" });
     }
     const snapshot = JSON.parse(readFileSync(SNAPSHOT_PATH, "utf8")) as Record<string, unknown>;
     const body = JSON.stringify({ available: true, snapshot_age_ms: now - statSync(SNAPSHOT_PATH).mtimeMs, ...snapshot });

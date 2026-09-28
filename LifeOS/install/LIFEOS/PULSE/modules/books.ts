@@ -10,7 +10,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 const MODULE_NAME = "books";
-const BOOKS_PATH = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "LIFEOS", "USER", "BOOKS.md");
+const BOOKS_PATH = join(process.env.LIFEOS_DIR || join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "LIFEOS"), "USER", "BOOKS.md");
 const state = { running: false };
 
 interface Book {

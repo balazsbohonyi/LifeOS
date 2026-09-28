@@ -16,7 +16,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 const MODULE_NAME = "projects";
-const USER_DIR = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "LIFEOS", "USER");
+const USER_DIR = join(process.env.LIFEOS_DIR || join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "LIFEOS"), "USER");
 const PROJECTS_PATH = join(USER_DIR, "PROJECTS.md");
 
 /** Every project source Pulse knows about — one tab each on the dashboard. */

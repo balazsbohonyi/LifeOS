@@ -20,13 +20,14 @@
 
 import { existsSync, mkdirSync, renameSync, rmSync, watch } from "fs";
 import { basename, dirname, join } from "path";
-import { homedir } from "os";
 import { LEGS, appendEvents, eventsPath, readState } from "../../TOOLS/Conveyor/Ledger";
+import { resolveRuntimePaths } from "../../TOOLS/RuntimePaths";
 
 const MODULE = "content";
 const STAGES = ["inbox", "prep", "produce", "review", "publishing", "done"] as const;
 
 const state = { running: false, startedAt: null as Date | null };
+const RUNTIME = resolveRuntimePaths();
 
 export async function start(): Promise<void> {
   console.log(`[${MODULE}] Starting (ledger: ${eventsPath()})`);
@@ -160,7 +161,7 @@ function deleteItem(id: string): Response {
 
   // 3. Artifacts (audio, transcript, derivatives).
   const artifacts = join(
-    process.env.LIFEOS_DIR || join(homedir(), ".claude", "LIFEOS"),
+    RUNTIME.lifeosDir,
     "MEMORY", "STATE", "content-pipeline", "artifacts", id,
   );
   try {
@@ -173,7 +174,7 @@ function deleteItem(id: string): Response {
   //    in-flight stage (transcription, audit, whatever) actually dies now.
   let kicked = false;
   const leaseLive = item.lease_expires && Date.parse(String(item.lease_expires)) > Date.now();
-  if (leaseLive || item.stage_status === "running") {
+  if ((leaseLive || item.stage_status === "running") && process.platform === "darwin") {
     const uid = Bun.spawnSync(["id", "-u"], { stdout: "pipe" }).stdout.toString().trim();
     const r = Bun.spawnSync(["launchctl", "kickstart", "-k", `gui/${uid}/com.lifeos.conveyor-runner`], {
       stdout: "pipe",

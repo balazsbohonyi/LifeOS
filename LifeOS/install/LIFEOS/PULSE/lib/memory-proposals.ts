@@ -30,7 +30,9 @@ import {
 import { assertInsideUserData } from "../../TOOLS/lib/ForeignDataCheck";
 
 const HOME = process.env.HOME ?? homedir();
-const OBS_DIR = join(HOME, ".claude", "LIFEOS", "MEMORY", "OBSERVABILITY");
+const CONFIG_ROOT = process.env.CLAUDE_CONFIG_DIR || join(HOME, ".claude");
+const LIFEOS_DIR = process.env.LIFEOS_DIR || join(CONFIG_ROOT, "LIFEOS");
+const OBS_DIR = join(LIFEOS_DIR, "MEMORY", "OBSERVABILITY");
 const PROPOSAL_REPLIES_LOG_PATH = join(OBS_DIR, "proposal-replies.jsonl");
 const IDENTITY_PROPOSALS_LOG_PATH = join(OBS_DIR, "identity-proposals.jsonl");
 
@@ -171,8 +173,8 @@ export function logProposalReply(event: Record<string, unknown>, path: string = 
   }
 }
 
-export function formatProposalMessage(p: ProposalRow, home: string = HOME): string {
-  const fileLabel = p.target_file.replace(`${home}/.claude/`, "");
+export function formatProposalMessage(p: ProposalRow, configRoot: string = CONFIG_ROOT): string {
+  const fileLabel = p.target_file.replace(`${configRoot}/`, "").replace(`${configRoot}\\`, "");
   const conf = p.confidence.toFixed(2);
   const obs = p.observed_across_sessions ?? 1;
   // P1 2026-05-25: prepend subtype badge so the principal sees at a glance
@@ -235,7 +237,7 @@ export function applyProposalEdit(targetFile: string, editText: string): { ok: t
   // from LIFEOS/PULSE, so a bare relative path resolved to a nonexistent nested path and every
   // apply failed with "target file missing" even though the file was present (public PR #1507,
   // credit @anikinsasha).
-  const resolved = isAbsolute(targetFile) ? targetFile : join(HOME, ".claude", targetFile);
+  const resolved = isAbsolute(targetFile) ? targetFile : join(CONFIG_ROOT, targetFile);
   if (!existsSync(resolved)) return { ok: false, reason: `target file missing: ${targetFile}` };
   // Boundary (2026-08-11 incident class): a proposal edit is personal content —
   // its target must physically resolve into the USER_DATA repo. pinProposalTargetFile

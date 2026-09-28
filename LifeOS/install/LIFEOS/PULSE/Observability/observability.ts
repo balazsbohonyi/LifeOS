@@ -28,7 +28,7 @@ for (const __k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
  *   GET  /, /work, /telos, /health, etc. — Static Next.js pages (fallback handler)
  */
 
-import { join, extname } from "path"
+import { isAbsolute, join, extname } from "path"
 import { readFileSync, readdirSync, existsSync, realpathSync, statSync, watch, openSync, readSync, closeSync, type FSWatcher } from "fs"
 import { spawnSync } from "child_process"
 import { homedir } from "os"
@@ -36,6 +36,7 @@ import YAML from "yaml"
 import { PULSE_BASE } from "../endpoint"
 import { RUN_ACTIVITY } from "../../TOOLS/ascent"
 import { loadLifeosConfig } from "../../TOOLS/LifeosConfig"
+import { resolveRuntimePaths } from "../../TOOLS/RuntimePaths.ts"
 
 // Normalize env path vars that Claude Code injects without shell expansion (LifeOS#1404)
 for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
@@ -71,8 +72,9 @@ export interface ObservabilityConfig {
 
 // ── Path Construction ──
 
-const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir()
-const LIFEOS_DIR = join(HOME, ".claude", "LIFEOS")
+const RUNTIME_PATHS = resolveRuntimePaths()
+const HOME = RUNTIME_PATHS.home
+const LIFEOS_DIR = RUNTIME_PATHS.lifeosDir
 const MEMORY_DIR = join(LIFEOS_DIR, "MEMORY")
 
 const WORK_JSON_PATH = join(MEMORY_DIR, "STATE", "work.json")
@@ -82,7 +84,7 @@ const SUBAGENT_EVENTS_PATH = join(MEMORY_DIR, "OBSERVABILITY", "subagent-events.
 const VOICE_EVENTS_PATH = join(MEMORY_DIR, "VOICE", "voice-events.jsonl")
 const TOOL_FAILURES_PATH = join(MEMORY_DIR, "OBSERVABILITY", "tool-failures.jsonl")
 const TOOL_ACTIVITY_PATH = join(MEMORY_DIR, "OBSERVABILITY", "tool-activity.jsonl")
-const SETTINGS_PATH = join(HOME, ".claude", "settings.json")
+const SETTINGS_PATH = join(RUNTIME_PATHS.configRoot, "settings.json")
 const LADDER_DIR = join(HOME, "Projects", "Ladder")
 
 const DEFAULT_DASHBOARD_DIR = join(LIFEOS_DIR, "PULSE", "Observability", "out")
@@ -190,8 +192,8 @@ function existsSafe(path: string): boolean {
 function getDashboardDir(): string {
   const dir = config.dashboard_dir ?? DEFAULT_DASHBOARD_DIR
   // Resolve relative paths against Pulse directory
-  if (!dir.startsWith("/")) {
-    return join(HOME, ".claude", "LIFEOS", "PULSE", dir)
+  if (!isAbsolute(dir)) {
+    return join(RUNTIME_PATHS.pulseDir, dir)
   }
   return dir
 }
@@ -4027,6 +4029,10 @@ function readBunkerState(): Record<string, BunkerAppState> {
 let svcCache: { at: number; healthy: number; loaded: number } | null = null
 function backgroundServicesUp(): { healthy: number; loaded: number } {
   if (svcCache && Date.now() - svcCache.at < 60_000) return svcCache
+  if (process.platform !== "darwin") {
+    svcCache = { at: Date.now(), healthy: 0, loaded: 0 }
+    return svcCache
+  }
   let healthy = 0
   let loaded = 0
   try {

@@ -17,11 +17,12 @@
 import { join, resolve } from "path"
 import { copyFileSync, existsSync, mkdirSync } from "fs"
 import { PULSE_BASE } from "./endpoint"
-import { homedir } from "node:os";
+import { findExecutable, resolveRuntimePaths } from "../TOOLS/RuntimePaths.ts"
 
-const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir()
-const LIFEOS_DIR = join(HOME, ".claude", "LIFEOS")
-const PULSE_DIR = join(LIFEOS_DIR, "PULSE")
+const RUNTIME = resolveRuntimePaths()
+const HOME = RUNTIME.home
+const LIFEOS_DIR = RUNTIME.lifeosDir
+const PULSE_DIR = RUNTIME.pulseDir
 
 // ── Helpers ──
 
@@ -220,7 +221,10 @@ max_concurrent = 1
 name = "github-work"
 schedule = "*/2 * * * *"
 type = "script"
-command = "bun run checks/github-work.ts"
+program = "bun"
+args = ["run", "checks/github-work.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 output = "log"
 enabled = true
 
@@ -228,7 +232,10 @@ enabled = true
 name = "healthcheck"
 schedule = "*/5 * * * *"
 type = "script"
-command = "bun run checks/health.ts"
+program = "bun"
+args = ["run", "checks/health.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 output = "log"
 enabled = true
 
@@ -274,7 +281,7 @@ enabled = true
     ``,
   ]
 
-  const envPath = join(HOME, ".claude", ".env")
+  const envPath = RUNTIME.envPath
   if (existsSync(envPath)) {
     warn(`.env already exists — appending worker config`)
     const existing = await Bun.file(envPath).text()
@@ -285,19 +292,52 @@ enabled = true
   ok(".env written")
 }
 
-// ── Step 5: Install launchd Service ──
+// ── Step 5: Install native Service ──
 // (The former Step 5 "Local HTTPS (mkcert)" was removed 2026-08-10: Pulse's TLS
 // support was retired (pulse.ts marks the tls config "unused — TLS removed"), so
 // the hosts entry and mkcert certificates it generated served nothing — a dead
 // flow that also shipped a retired-brand hostname string. Max payload audit W5.)
 
 async function installService(force = false): Promise<void> {
-  heading("Step 5: Installing launchd Service")
+  heading("Step 5: Installing Pulse Service")
 
   // Create directories
   for (const dir of ["state", "logs"]) {
     const path = join(PULSE_DIR, dir)
     if (!existsSync(path)) mkdirSync(path, { recursive: true })
+  }
+
+  if (process.platform === "win32") {
+    const powershell = findExecutable("powershell") ?? findExecutable("powershell.exe")
+    const bun = findExecutable("bun")
+    const manager = join(PULSE_DIR, "manage.ps1")
+    if (!powershell) throw new Error("Windows PowerShell 5.1+ was not found")
+    if (!bun) throw new Error("Bun was not found; install Bun before provisioning Pulse")
+    if (!existsSync(manager)) throw new Error(`Pulse lifecycle manager is missing: ${manager}`)
+
+    const proc = Bun.spawn([
+      powershell,
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy", "Bypass",
+      "-File", manager,
+      "install",
+      "-ConfigRoot", RUNTIME.configRoot,
+      "-BunPath", bun,
+      "-Json",
+    ], { stdout: "pipe", stderr: "pipe", cwd: PULSE_DIR })
+    const [code, stdout, stderr] = await Promise.all([
+      proc.exited,
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ])
+    if (code !== 0) throw new Error(stderr.trim() || stdout.trim() || "Pulse task installation failed")
+    ok("Windows Task Scheduler service installed")
+    return
+  }
+
+  if (process.platform !== "darwin") {
+    throw new Error(`Worker setup service installation is not implemented for ${process.platform}`)
   }
 
   const plistSrc = join(PULSE_DIR, "com.lifeos.pulse.plist")
@@ -342,7 +382,7 @@ async function healthCheck(): Promise<void> {
   await Bun.sleep(3_000)
 
   const pidPath = join(PULSE_DIR, "state", "pulse.pid")
-  if (existsSync(pidPath)) {
+  if (process.platform !== "win32" && existsSync(pidPath)) {
     const pid = (await Bun.file(pidPath).text()).trim()
     const proc = Bun.spawn(["ps", "-p", pid], { stdout: "pipe", stderr: "pipe" })
     const code = await proc.exited
@@ -351,7 +391,7 @@ async function healthCheck(): Promise<void> {
     } else {
       warn(`Pulse PID ${pid} not running — check logs/pulse-stderr.log`)
     }
-  } else {
+  } else if (process.platform !== "win32") {
     warn("No PID file — Pulse may not have started")
   }
 
@@ -363,7 +403,7 @@ async function healthCheck(): Promise<void> {
       ok(`Hook server responding — ${(data.jobs as unknown[])?.length ?? 0} jobs loaded`)
     }
   } catch {
-    warn("Hook server not responding on port 31337")
+    warn("Pulse server not responding on port 31337")
   }
 }
 
@@ -410,10 +450,10 @@ ${"═".repeat(50)}
   Time: ${Math.floor(elapsed / 60)}m ${elapsed % 60}s
 
   Next steps:
-  - Verify ANTHROPIC_API_KEY is set in ${join(HOME, ".claude", ".env")}
+  - Verify ANTHROPIC_API_KEY is set in ${RUNTIME.envPath}
   - Create a test issue with label "status:ready" in one of your repos
-  - Watch: tail -f ${join(PULSE_DIR, "logs", "pulse-stdout.log")}
-  - Status: ${join(PULSE_DIR, "manage.sh")} status
+  - Logs: ${join(PULSE_DIR, "logs", "pulse-stdout.log")}
+  - Status: ${process.platform === "win32" ? `powershell -File "${join(PULSE_DIR, "manage.ps1")}" status` : `${join(PULSE_DIR, "manage.sh")} status`}
 ${"═".repeat(50)}
 `)
 }

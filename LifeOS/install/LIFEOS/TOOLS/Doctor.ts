@@ -40,12 +40,12 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, readdirSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { createHash, randomBytes } from 'crypto';
-import { homedir } from "node:os";
+import { findExecutable, resolveRuntimePaths } from "./RuntimePaths.ts";
 
-const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir();
-const CONFIG_ROOT = process.env.CLAUDE_CONFIG_DIR || join(HOME, '.claude');
-const LIFEOS_DIR = (process.env.LIFEOS_DIR || join(CONFIG_ROOT, 'LIFEOS'))
-  .replace(/^\$HOME/, HOME).replace(/^~(?=\/)/, HOME);
+const RUNTIME_PATHS = resolveRuntimePaths();
+const HOME = RUNTIME_PATHS.home;
+const CONFIG_ROOT = RUNTIME_PATHS.configRoot;
+const LIFEOS_DIR = RUNTIME_PATHS.lifeosDir;
 const STATE_DIR = join(LIFEOS_DIR, 'MEMORY', 'STATE');
 const MANIFEST = join(STATE_DIR, 'capabilities.json');
 const SALT_FILE = join(STATE_DIR, '.capabilities-salt');
@@ -107,8 +107,7 @@ async function run(cmd: string[], timeoutMs = PROBE_TIMEOUT_MS): Promise<{ code:
 }
 
 function which(bin: string): boolean {
-  const paths = (process.env.PATH || '').split(':');
-  return paths.some(p => p && existsSync(join(p, bin)));
+  return Boolean(findExecutable(bin));
 }
 
 /**
@@ -117,11 +116,7 @@ function which(bin: string): boolean {
  * '/', so the fallback must yield a real path (public PR #1567, @vibecrypto).
  */
 function whichPath(bin: string): string | null {
-  const paths = (process.env.PATH || '').split(':');
-  for (const p of paths) {
-    if (p && existsSync(join(p, bin))) return join(p, bin);
-  }
-  return null;
+  return findExecutable(bin) ?? null;
 }
 
 function envKey(name: string): string | null {
@@ -145,6 +140,7 @@ function envKey(name: string): string | null {
 const RECLAIM_BACKUP_DIR = join(STATE_DIR, 'reclaimed-shadow-backups');
 
 async function findShadowHomeDirs(): Promise<string[]> {
+  if (process.platform === 'win32') return [];
   // `find` for guaranteed availability; prune heavy/irrelevant dirs and our
   // own reclaim backups (which contain moved '$HOME' dirs by construction —
   // without the prune every past reclaim would re-trigger detection forever).
@@ -273,6 +269,37 @@ function chromeBinary(): string | null {
 // ── capability registry ──────────────────────────────────────────────────────
 
 const CAPS: CapSpec[] = [
+  {
+    id: 'pulse-windows',
+    title: 'Pulse native Windows lifecycle',
+    powers: 'logon startup, dashboard health, structured jobs, voice playback, and desktop notifications',
+    ttlHours: 24,
+    configured: () => true,
+    probeOffline: async () => {
+      if (process.platform !== 'win32') return { ok: true, detail: 'not applicable on this platform' };
+      const manager = join(RUNTIME_PATHS.pulseDir, 'manage.ps1');
+      const powershell = findExecutable('powershell');
+      if (!existsSync(manager) || !powershell) return { ok: false, detail: 'manage.ps1 or Windows PowerShell is missing' };
+      const status = await run([powershell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', manager, 'status', '-Json', '-ConfigRoot', CONFIG_ROOT]);
+      let parsed: any = null;
+      try { parsed = JSON.parse(status.out); } catch { /* detail below */ }
+      if (!parsed?.taskOwned) return { ok: false, detail: `scheduled task is missing or unowned (${parsed?.task ?? 'unknown'})` };
+      if (!parsed?.responding || !parsed?.instanceId) return { ok: false, detail: 'task is owned but /healthz has no matching live instance' };
+      if (!parsed?.lockOwned) return { ok: false, detail: 'Pulse responds but its ownership lock is missing or belongs to another root' };
+
+      const ffplay = findExecutable('ffplay') ?? process.env.LIFEOS_FFPLAY_PATH;
+      const shortcut = join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'LifeOS Pulse.lnk');
+      const userConfig = join(RUNTIME_PATHS.userDir, 'CONFIG', 'PULSE.user.toml');
+      if (existsSync(userConfig)) {
+        const raw = readFileSync(userConfig, 'utf8');
+        const ambiguous = raw.includes('command =') && !raw.includes('shell = "powershell"');
+        if (ambiguous) return { ok: false, detail: 'PULSE.user.toml has a legacy string command without shell = "powershell"' };
+      }
+      const optional = [!ffplay ? 'ffplay missing (voice degraded)' : null, !existsSync(shortcut) ? 'toast shortcut missing' : null].filter(Boolean);
+      return { ok: true, detail: `task, dashboard, lock, and structured scheduler live${optional.length ? `; ${optional.join('; ')}` : ''}` };
+    },
+    fixCmd: 'powershell -ExecutionPolicy Bypass -File <configRoot>/LIFEOS/PULSE/manage.ps1 repair  (optional voice: winget install --id Gyan.FFmpeg --exact)',
+  },
   {
     // Identity substitution has no programmatic caller — the install is
     // AI-driven and Setup.md instructs the agent to run substituteTree, so a

@@ -18,18 +18,12 @@ import { dirname, join } from "path"
 import { homedir } from "node:os";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir()
+const LIFEOS_DIR = process.env.LIFEOS_DIR || join(process.env.CLAUDE_CONFIG_DIR || join(HOME, ".claude"), "LIFEOS")
 const MODULE_NAME = "syslog"
 const DEFAULT_PORT = 5514
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50 MB rotation threshold
 
-const LOG_PATH = join(
-  HOME,
-  ".claude",
-  "LIFEOS",
-  "MEMORY",
-  "OBSERVABILITY",
-  "unifi-syslog.jsonl",
-)
+const LOG_PATH = join(LIFEOS_DIR, "MEMORY", "OBSERVABILITY", "unifi-syslog.jsonl")
 
 type Severity = "emerg" | "alert" | "crit" | "err" | "warn" | "notice" | "info" | "debug"
 
