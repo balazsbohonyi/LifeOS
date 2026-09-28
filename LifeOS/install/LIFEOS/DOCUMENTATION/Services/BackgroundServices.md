@@ -8,16 +8,18 @@ generator: LIFEOS/TOOLS/Services.ts (run `bun Services.ts doc` to regenerate the
 
 # LifeOS Background Services
 
+Path note: `${LIFEOS_DIR}` is the active LifeOS runtime location selected for this installation. This catalog and its launch/install commands describe the macOS service registry unless a row explicitly identifies another platform; it is not a claim that every listed background service is supported on Windows or Linux.
+
 > **Every recurring Mac service LifeOS runs, in one place — what it is, how often it fires, and how to install it. One tool controls them all: `LIFEOS/TOOLS/Services.ts`.** Before this doc, the install story was scattered across a dozen `Install*.ts` scripts, Pulse `manage.sh` files, and hand-installed launchd jobs, with nothing that listed what was actually running. This is the fix.
 
 ## The one-shot
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/Services.ts status              # what's running vs installed vs available
-bun ~/.claude/LIFEOS/TOOLS/Services.ts install --all --yes # stand up every service (macOS)
-bun ~/.claude/LIFEOS/TOOLS/Services.ts install --only worksweep,amberroute --yes
-bun ~/.claude/LIFEOS/TOOLS/Services.ts uninstall --only amberroute
-bun ~/.claude/LIFEOS/TOOLS/Services.ts doc                 # regenerate the table below
+bun ${LIFEOS_DIR}/TOOLS/Services.ts status              # what's running vs installed vs available
+bun ${LIFEOS_DIR}/TOOLS/Services.ts install --all --yes # stand up every service (macOS)
+bun ${LIFEOS_DIR}/TOOLS/Services.ts install --only worksweep,amberroute --yes
+bun ${LIFEOS_DIR}/TOOLS/Services.ts uninstall --only amberroute
+bun ${LIFEOS_DIR}/TOOLS/Services.ts doc                 # regenerate the table below
 ```
 
 `status` and `doc` are **read-only** (safe anytime). `install`/`uninstall` call `launchctl` — a privileged step, so the human (or the installing AI, with permission) runs them; `install` without `--yes` is a dry preview. Core services install by default; opt-in ones need `--all` or `--only`.
@@ -40,26 +42,26 @@ bun ~/.claude/LIFEOS/TOOLS/Services.ts doc                 # regenerate the tabl
 
 | Service | Category | Cadence | Opt-in | Purpose | Install |
 |---------|----------|---------|--------|---------|---------|
-| **Pulse (dashboard server)** `com.lifeos.pulse` | pulse | at load | core | The Life Dashboard HTTP server on :31337 — Pulse, the visible surface onto LifeOS. | `bash ~/.claude/LIFEOS/PULSE/manage.sh install` |
-| **Pulse menu-bar app** `com.lifeos.pulse-menubar` | pulse | at load | core | macOS menu-bar app for Pulse — quick status + open the dashboard. | `bash ~/.claude/LIFEOS/PULSE/MenuBar/install.sh` |
-| **Pulse deriver** `com.lifeos.deriver` | pulse | daily/scheduled | core | Regenerates Pulse's derived Data-Plane pages on a cadence. | `bash ~/.claude/LIFEOS/PULSE/manage-deriver.sh install` |
-| **Hermes sidecar (gateway)** `ai.hermes.gateway` | sidecar | at load | yes | The second front door — Hermes gateway mounting this LifeOS install, serving its message channels. Health probe: `bun LIFEOS/HERMES/Health.ts`. | `bun ~/.claude/LIFEOS/HERMES/Mount.ts` |
-| **Conduit (sensory capture)** `com.lifeos.conduit` | capture | every 2m | core | Local current-state capture — feeds memory + TELOS current state. | `bun ~/.claude/LIFEOS/PULSE/Conduit/InstallConduit.ts` |
-| **Conduit insight builder** `com.lifeos.conduit.insight` | capture | every 1h | core | Builds insights from Conduit's captured signal. | `bun ~/.claude/LIFEOS/PULSE/Conduit/InstallConduitInsight.ts` |
+| **Pulse (dashboard server)** `com.lifeos.pulse` | pulse | at load | core | The Life Dashboard HTTP server on :31337 — Pulse, the visible surface onto LifeOS. | `bash ${LIFEOS_DIR}/PULSE/manage.sh install` |
+| **Pulse menu-bar app** `com.lifeos.pulse-menubar` | pulse | at load | core | macOS menu-bar app for Pulse — quick status + open the dashboard. | `bash ${LIFEOS_DIR}/PULSE/MenuBar/install.sh` |
+| **Pulse deriver** `com.lifeos.deriver` | pulse | daily/scheduled | core | Regenerates Pulse's derived Data-Plane pages on a cadence. | `bash ${LIFEOS_DIR}/PULSE/manage-deriver.sh install` |
+| **Hermes sidecar (gateway)** `ai.hermes.gateway` | sidecar | at load | yes | The second front door — Hermes gateway mounting this LifeOS install, serving its message channels. Health probe: `bun LIFEOS/HERMES/Health.ts`. | `bun ${LIFEOS_DIR}/HERMES/Mount.ts` |
+| **Conduit (sensory capture)** `com.lifeos.conduit` | capture | every 2m | core | Local current-state capture — feeds memory + TELOS current state. | `bun ${LIFEOS_DIR}/PULSE/Conduit/InstallConduit.ts` |
+| **Conduit insight builder** `com.lifeos.conduit.insight` | capture | every 1h | core | Builds insights from Conduit's captured signal. | `bun ${LIFEOS_DIR}/PULSE/Conduit/InstallConduitInsight.ts` |
 | **Synthesis** `com.lifeos.synthesis` | maintenance | daily/scheduled | yes | Periodic synthesis pass over recent state/memory (weekly-style rollup). | installed with the Pulse/Conduit stack — see PULSE/ |
-| **Cortex distill (weekly digest)** `com.lifeos.distill` | maintenance | weekly (Sun 09:00) | yes | Weekly harvest of the Knowledge Archive into a routed digest — content ideas → work issues, improvements → Upgrades store, archive health report; stateful dedupe. | plist written by the Cortex skill's distill workflow — `bun ~/.claude/LIFEOS/TOOLS/KnowledgeDistill.ts run --headless` |
-| **Conveyor inbox watcher** `com.lifeos.conveyor-watcher` | capture | at load | yes | Watches ~/Recordings/Inbox and registers dropped recordings in the content-pipeline ledger (Conveyor P1). | `bun ~/.claude/LIFEOS/TOOLS/InstallConveyorWatcher.ts` |
-| **Conveyor stage engine** `com.lifeos.conveyor-runner` | capture | at load | yes | Advances claimable INBOX items to PREP via transcription, lease-guarded, one item per tick (Conveyor P2 stage 1). | `bun ~/.claude/LIFEOS/TOOLS/InstallConveyorRunner.ts` |
-| **Work sweep** `com.lifeos.worksweep` | sweep | every 1h | yes | Hourly UL work capture — untracked sessions, stale items, project checks, TELOS-goal derivation. | `bun ~/.claude/LIFEOS/TOOLS/InstallWorkSweep.ts` |
+| **Cortex distill (weekly digest)** `com.lifeos.distill` | maintenance | weekly (Sun 09:00) | yes | Weekly harvest of the Knowledge Archive into a routed digest — content ideas → work issues, improvements → Upgrades store, archive health report; stateful dedupe. | plist written by the Cortex skill's distill workflow — `bun ${LIFEOS_DIR}/TOOLS/KnowledgeDistill.ts run --headless` |
+| **Conveyor inbox watcher** `com.lifeos.conveyor-watcher` | capture | at load | yes | Watches ~/Recordings/Inbox and registers dropped recordings in the content-pipeline ledger (Conveyor P1). | `bun ${LIFEOS_DIR}/TOOLS/InstallConveyorWatcher.ts` |
+| **Conveyor stage engine** `com.lifeos.conveyor-runner` | capture | at load | yes | Advances claimable INBOX items to PREP via transcription, lease-guarded, one item per tick (Conveyor P2 stage 1). | `bun ${LIFEOS_DIR}/TOOLS/InstallConveyorRunner.ts` |
+| **Work sweep** `com.lifeos.worksweep` | sweep | every 1h | yes | Hourly UL work capture — untracked sessions, stale items, project checks, TELOS-goal derivation. | `bun ${LIFEOS_DIR}/TOOLS/InstallWorkSweep.ts` |
 | **Atlas asset-graph sync** `com.lifeos.atlas` | sync | every 15m | yes | Reconciles the Atlas asset graph — 15-min tick (hourly full sync) + event-hint targeted syncs via WatchPaths. | `manual plist — ~/Library/LaunchAgents/com.lifeos.atlas.plist (see LIFEOS/DOCUMENTATION/Atlas/AtlasSystem.md)` |
-| **Derived-file sync** `com.lifeos.derivedsync` | sync | on file-change | yes | Watches 31 USER source files; regenerates PRINCIPAL_TELOS, LIFEOS_STATE, Data-Plane on hand-edits. | `bun ~/.claude/LIFEOS/TOOLS/InstallDerivedSync.ts` |
-| **Health sync** `com.lifeos.healthsync` | sync | every 1h | yes | Syncs health data into CURRENT_STATE. | `bun ~/.claude/LIFEOS/TOOLS/InstallHealthSync.ts` |
-| **Codex update** `com.lifeos.codexupdate` | maintenance | daily/scheduled | yes | Keeps the Codex mirror / update state current. | `bun ~/.claude/LIFEOS/TOOLS/InstallCodexUpdate.ts` |
-| **Inbox sweep** `com.lifeos.inboxsweep` | sweep | every 5m | yes | Every 5 min: deterministic Gmail triage — archives marketing/notification (podcast pitches, cold outreach) via _INBOX sender taxonomy; keep-classes hard-guarded. | `bun ~/.claude/LIFEOS/TOOLS/InstallInboxSweep.ts` |
-| **Commitment sweep** `com.lifeos.commitmentsweep` | sweep | daily/scheduled | yes | Sweeps commitments/reminders on a cadence. | `bun ~/.claude/LIFEOS/TOOLS/InstallCommitmentSweep.ts` |
-| **Blog discovery** `com.lifeos.blogdiscovery` | sweep | daily/scheduled | yes | Discovers blog-worthy signal on a cadence. | `bun ~/.claude/LIFEOS/TOOLS/InstallBlogDiscovery.ts` |
-| **Usage aggregator** `com.lifeos.usage-aggregator` | maintenance | daily/scheduled | yes | Aggregates usage/cost telemetry for Pulse. | `bun ~/.claude/LIFEOS/TOOLS/InstallUsageAggregator.ts` |
-| **Bunker app monitor** `com.lifeos.bunkermonitor` | sweep | every 5m | yes | Every 5 min: re-runs every Bunker app's ISA Test Strategy probes; emails on green→red / red→green transitions. | `bun ~/.claude/LIFEOS/TOOLS/InstallBunkerMonitor.ts` |
+| **Derived-file sync** `com.lifeos.derivedsync` | sync | on file-change | yes | Watches 31 USER source files; regenerates PRINCIPAL_TELOS, LIFEOS_STATE, Data-Plane on hand-edits. | `bun ${LIFEOS_DIR}/TOOLS/InstallDerivedSync.ts` |
+| **Health sync** `com.lifeos.healthsync` | sync | every 1h | yes | Syncs health data into CURRENT_STATE. | `bun ${LIFEOS_DIR}/TOOLS/InstallHealthSync.ts` |
+| **Codex update** `com.lifeos.codexupdate` | maintenance | daily/scheduled | yes | Keeps the Codex mirror / update state current. | `bun ${LIFEOS_DIR}/TOOLS/InstallCodexUpdate.ts` |
+| **Inbox sweep** `com.lifeos.inboxsweep` | sweep | every 5m | yes | Every 5 min: deterministic Gmail triage — archives marketing/notification (podcast pitches, cold outreach) via _INBOX sender taxonomy; keep-classes hard-guarded. | `bun ${LIFEOS_DIR}/TOOLS/InstallInboxSweep.ts` |
+| **Commitment sweep** `com.lifeos.commitmentsweep` | sweep | daily/scheduled | yes | Sweeps commitments/reminders on a cadence. | `bun ${LIFEOS_DIR}/TOOLS/InstallCommitmentSweep.ts` |
+| **Blog discovery** `com.lifeos.blogdiscovery` | sweep | daily/scheduled | yes | Discovers blog-worthy signal on a cadence. | `bun ${LIFEOS_DIR}/TOOLS/InstallBlogDiscovery.ts` |
+| **Usage aggregator** `com.lifeos.usage-aggregator` | maintenance | daily/scheduled | yes | Aggregates usage/cost telemetry for Pulse. | `bun ${LIFEOS_DIR}/TOOLS/InstallUsageAggregator.ts` |
+| **Bunker app monitor** `com.lifeos.bunkermonitor` | sweep | every 5m | yes | Every 5 min: re-runs every Bunker app's ISA Test Strategy probes; emails on green→red / red→green transitions. | `bun ${LIFEOS_DIR}/TOOLS/InstallBunkerMonitor.ts` |
 | **Synapse router** `com.lifeos.amberroute` | capture | every 30m | yes | Every 30 min: TELOS-grade unrouted Synapse captures → KNOWLEDGE notes / UL issues. | per-install private infrastructure — defined in `LIFEOS/USER/CONFIG/services.json`, NOT in the public release payload |
 | **Bookmark pipeline watchdog** `com.lifeos.bookmark-watchdog` | capture | every 4h | yes | Watches the X bookmark → summarize/idea pipeline for stalls. | per-install private infrastructure — defined in `LIFEOS/USER/CONFIG/services.json`, NOT in the public release payload |
 | **Backups** `com.lifeos.backups` | maintenance | daily/scheduled | yes | Daily 03:00 PT repo backup (Git LFS). | per-install private infrastructure — defined in `LIFEOS/USER/CONFIG/services.json`, NOT in the public release payload |
@@ -81,7 +83,7 @@ An operator wants to know what is actually running. `Services.ts status` merges 
 They spot the hourly work sweep sitting in "available." One command stands it up:
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/Services.ts install --only worksweep --yes
+bun ${LIFEOS_DIR}/TOOLS/Services.ts install --only worksweep --yes
 ```
 
 Because the next `status` reads the live plist again — not a hand-kept note — it shows the sweep running with its real cadence. There is no place for the list to drift from the truth.

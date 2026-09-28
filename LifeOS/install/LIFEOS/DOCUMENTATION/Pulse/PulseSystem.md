@@ -9,16 +9,18 @@ version: 1.7.6
 
 # Pulse — the Life Dashboard
 
+Path note: `${LIFEOS_DIR}` and `${CLAUDE_CONFIG_DIR}` below are placeholders for the active runtime and config roots selected by LifeOS (for example, a `.codex` or legacy `.claude` installation). Substitute those paths when running shell commands; they are not guaranteed to be exported in the interactive shell.
+
 **Pulse is the Life Dashboard.** It is the visible surface of the LifeOS Life Operating System — the place where you (and your DA) see and interact with everything the OS is doing. LifeOS is the OS; Pulse is how you watch it run.
 
 Every Pulse module is a sub-surface of the Dashboard: real-time observability, voice notifications, chat surfaces (iMessage, Siri bridge), scheduled work, background worker state, DA heartbeat, and — as the dashboard grows — live views of current state vs ideal state, goal progress, workflows, and day-in-the-life preview. A LifeOS with no dashboard would still be a LifeOS; Pulse is what keeps it visible.
 
 **Canonical thesis:** `LIFEOS/DOCUMENTATION/LifeOs/LifeOsThesis.md` — the source of truth for what LifeOS is, what the DA is, and why Pulse exists.
 
-**Implementation:** The unified daemon of LifeOS — a single always-on process that handles cron jobs, voice notifications, hook validation, observability APIs + dashboard, iMessage chat, the Siri bridge, and GitHub work polling. Pulse is THE local runtime for all LifeOS services. At v2.0 it absorbed VoiceServer, TelegramBot, the iMessage bot, and the Observability server into crash-isolated modules running under one process, one port (31337), and one launchd plist (`com.lifeos.pulse`) — the Telegram module has since been removed (2026-07-15).
+**Implementation:** The unified daemon of LifeOS — a single always-on process that handles scheduled jobs, voice notifications, hook validation, observability APIs + dashboard, and other enabled modules. Pulse is the local runtime for its supported LifeOS services. It runs under a platform supervisor: Task Scheduler on Windows, launchd on macOS, or systemd on Linux. Platform-specific modules and integrations may still be unavailable on some operating systems.
 
 **Version:** 2.0 (2026-04-01)
-**Location:** `~/.claude/LIFEOS/PULSE/`
+**Location:** `${LIFEOS_DIR}/PULSE/`
 
 ---
 
@@ -288,7 +290,7 @@ The knobs are hardcoded in `pulse.ts`: `MAX_FAILURES = 3`, `FAILURE_RETRY_COOLDO
 
 ### state.json
 
-Located at `~/.claude/Pulse/state/state.json`. Written atomically (write to `.tmp`, rename) after each job execution.
+Located at `${LIFEOS_DIR}/PULSE/state/state.json`. Written atomically (write to `.tmp`, rename) after each job execution.
 
 ```json
 {
@@ -411,12 +413,15 @@ main().catch((err) => {
 name = "my-check"
 schedule = "*/15 * * * *"
 type = "script"
-command = "bun run checks/my-check.ts"
+program = "bun"
+args = ["run", "checks/my-check.ts"]
+working_dir = "${PULSE_DIR}"
+platforms = ["darwin", "linux", "windows"]
 output = "ntfy"
 enabled = true
 ```
 
-3. Restart Pulse: `~/.claude/Pulse/manage.sh restart`
+3. Restart Pulse using the manager for the current OS. On macOS/Linux: `bash ${LIFEOS_DIR}/PULSE/manage.sh restart`. On Windows PowerShell, run `manage.ps1 repair` with the installed config root and explicit config-file path; repair validates and restarts the owned scheduled task.
 
 ### Modifying an Existing Job
 
@@ -531,22 +536,34 @@ With all jobs enabled including proactive-suggestions: ~$0.065/day.
 ### Check Status
 
 ```bash
-~/.claude/Pulse/manage.sh status
+${LIFEOS_DIR}/PULSE/manage.sh status
 ```
 
 Shows PID, uptime, and per-job last run times with failure counts.
+
+On Windows, use the native lifecycle manager from PowerShell:
+
+```powershell
+$configRoot = Join-Path $env:USERPROFILE '.codex' # use the configured root for this installation
+$configPath = Join-Path $configRoot 'LIFEOS\USER\CONFIG\LIFEOS_CONFIG.toml'
+$manager = Join-Path $configRoot 'LIFEOS\PULSE\manage.ps1'
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $manager status -Json `
+  -ConfigRoot $configRoot -ConfigPath $configPath
+```
+
+Use `repair` to refresh/restart an already-owned task, or `install` when no Pulse task exists. Do not pass `-Handoff` unless intentionally approving a conflict takeover.
 
 ### View Logs
 
 ```bash
 # Recent stdout (structured JSON)
-tail -50 ~/.claude/Pulse/logs/pulse-stdout.log
+tail -50 ${LIFEOS_DIR}/PULSE/logs/pulse-stdout.log
 
 # Recent errors
-tail -50 ~/.claude/Pulse/logs/pulse-stderr.log
+tail -50 ${LIFEOS_DIR}/PULSE/logs/pulse-stderr.log
 
 # Follow live
-tail -f ~/.claude/Pulse/logs/pulse-stdout.log | bun -e "process.stdin.on('data', d => { try { const e = JSON.parse(d); console.log(e.ts, e.level, e.msg) } catch {} })"
+tail -f ${LIFEOS_DIR}/PULSE/logs/pulse-stdout.log | bun -e "process.stdin.on('data', d => { try { const e = JSON.parse(d); console.log(e.ts, e.level, e.msg) } catch {} })"
 ```
 
 ### Common Issues
@@ -556,9 +573,9 @@ tail -f ~/.claude/Pulse/logs/pulse-stdout.log | bun -e "process.stdin.on('data',
 | "NOT RUNNING (no PID file)" | Pulse not started or crashed without recovery | `manage.sh install` |
 | "DEAD (stale PID)" | Process died but launchd did not restart | `manage.sh restart` |
 | Job stuck in circuit breaker | 3+ consecutive failures | Fix the check script; retries automatically after the 6h cooldown, or `manage.sh restart` to retry now |
-| "ntfy dispatch skipped" | Missing env var | Set `NTFY_TOPIC` in `~/.claude/.env` |
+| "ntfy dispatch skipped" | Missing env var | Set `NTFY_TOPIC` in `${CLAUDE_CONFIG_DIR}/.env` |
 | Voice notifications silent | Voice module not running or Pulse down | `manage.sh restart`; check `[voice] enabled = true` in PULSE.toml |
-| Calendar returns NO_EVENTS always | Missing or expired refresh token | Set `GOOGLE_CALENDAR_REFRESH_TOKEN` in `~/.claude/.env` |
+| Calendar returns NO_EVENTS always | Missing or expired refresh token | Set `GOOGLE_CALENDAR_REFRESH_TOKEN` in `${CLAUDE_CONFIG_DIR}/.env` |
 | State file corrupt | Interrupted write (unlikely, writes are atomic) | Delete `state/state.json` and restart |
 
 ### Manual Job Test
@@ -566,7 +583,7 @@ tail -f ~/.claude/Pulse/logs/pulse-stdout.log | bun -e "process.stdin.on('data',
 Run a check script directly to verify it works:
 
 ```bash
-cd ~/.claude/Pulse
+cd ${LIFEOS_DIR}/PULSE
 bun run checks/health.ts
 bun run checks/calendar.ts
 bun run checks/email.ts
@@ -578,10 +595,11 @@ bun run checks/github.ts
 ## File Inventory
 
 ```
-~/.claude/Pulse/
+${LIFEOS_DIR}/PULSE/
 ├── pulse.ts                  # Main daemon -- startup, module init, heartbeat loop
 ├── PULSE.toml                # Job + module configuration
 ├── manage.sh                 # Process management -- start/stop/status/install
+├── manage.ps1                # Native Windows Task Scheduler lifecycle manager
 ├── com.lifeos.pulse.plist    # launchd config (macOS) -- auto-start, keep-alive
 ├── com.lifeos.pulse.service  # systemd user unit (Linux) -- auto-start, restart-on-failure
 ├── lib/
@@ -627,7 +645,7 @@ bun run checks/github.ts
 
 LifeOS Pulse includes a native macOS menu bar app that shows daemon status at a glance. The menu bar app is launched automatically by Pulse on startup -- no separate launchd plist needed.
 
-**Location:** `~/.claude/LIFEOS/PULSE/MenuBar/`
+**Location:** `${LIFEOS_DIR}/PULSE/MenuBar/`
 **Installed to:** `~/Applications/LifeOS Pulse.app`
 **Launched by:** Pulse process on startup (no separate launchd plist)
 
@@ -649,7 +667,7 @@ Reads `state/state.json` directly every 5 seconds (no HTTP endpoint needed). Che
 ### Building and Installing
 
 ```bash
-cd ~/.claude/LIFEOS/PULSE/MenuBar
+cd ${LIFEOS_DIR}/PULSE/MenuBar
 bash install.sh    # Builds, deploys to ~/Applications, installs plist
 ```
 
@@ -680,7 +698,7 @@ Pulse includes an integrated HTTP hook validation server as the `hooks` module (
 
 ### Hook Configuration
 
-The hooks are configured in `~/.claude/settings.json` as HTTP hooks pointing to `http://localhost:31337/hooks/*`.
+The hooks are configured in `${CLAUDE_CONFIG_DIR}/settings.json` as HTTP hooks pointing to `http://localhost:31337/hooks/*`.
 
 ---
 
@@ -747,7 +765,7 @@ This ensures the browser always picks up new builds without stale content.
 After building the Observatory dashboard, Pulse must be restarted to pick up new files:
 
 ```bash
-cd ~/.claude/LIFEOS/Observability && bun run build
+cd ${LIFEOS_DIR}/Observability && bun run build
 launchctl stop com.lifeos.pulse && launchctl start com.lifeos.pulse
 ```
 

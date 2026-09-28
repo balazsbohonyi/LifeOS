@@ -4,11 +4,13 @@ version: 1.8.4
 
 # The Observability System
 
+Path note: `${LIFEOS_DIR}` and `${CLAUDE_CONFIG_DIR}` refer to the active LifeOS runtime/config roots, not specifically a `.claude` installation. Substitute the installed paths when running shell examples.
+
 > You can't steer a Life OS you can't see (`LIFEOS/DOCUMENTATION/LifeOs/LifeOsThesis.md`). Observability is the raw sensory feed behind the Life Dashboard — every tool call, agent, and failure as inspectable events, so both the principal and the DA can verify the hill-climb is actually climbing.
 
 Single-source local event pipeline for LifeOS tool activity, voice events, subagent lifecycle, and tool failures. Pulse is the only consumer; it reads JSONL from local disk on demand.
 
-> **Infrastructure:** The observability HTTP server (`localhost:31337`) runs as a module inside the unified Pulse daemon (`~/.claude/LIFEOS/PULSE/Observability/observability.ts`). There is no separate observability server process -- Pulse serves all local HTTP endpoints on port 31337.
+> **Infrastructure:** The observability HTTP server (`localhost:31337`) runs as a module inside the unified Pulse daemon (`${LIFEOS_DIR}/PULSE/Observability/observability.ts`). There is no separate observability server process -- Pulse serves all local HTTP endpoints on port 31337.
 
 ## Architecture
 
@@ -107,9 +109,9 @@ Pulse reads on demand. The Observatory dashboard polls `/api/events/recent` ever
 
 | File | Role |
 |------|------|
-| `~/.claude/hooks/EventLogger.hook.ts` | Consolidated event writer (absorbed ToolActivityTracker + ToolFailureTracker + SkillExecutionLog + ConfigAudit + StopFailureHandler 2026-07-11). PostToolUse catch-all → tool-activity.jsonl (+ SKILLS/execution.jsonl on Skill); PostToolUseFailure → tool-failures.jsonl; ConfigChange → config-changes.jsonl; StopFailure → SECURITY stop-failures (log-only) |
-| `~/.claude/LIFEOS/PULSE/Observability/observability.ts` | Observability module inside unified Pulse daemon — serves events from JSONL at :31337 |
-| `~/.claude/LIFEOS/PULSE/Observability/` | Next.js static dashboard — polls `/api/events/recent` |
+| `${CLAUDE_CONFIG_DIR}/hooks/EventLogger.hook.ts` | Consolidated event writer (absorbed ToolActivityTracker + ToolFailureTracker + SkillExecutionLog + ConfigAudit + StopFailureHandler 2026-07-11). PostToolUse catch-all → tool-activity.jsonl (+ SKILLS/execution.jsonl on Skill); PostToolUseFailure → tool-failures.jsonl; ConfigChange → config-changes.jsonl; StopFailure → SECURITY stop-failures (log-only) |
+| `${LIFEOS_DIR}/PULSE/Observability/observability.ts` | Observability module inside unified Pulse daemon — serves events from JSONL at :31337 |
+| `${LIFEOS_DIR}/PULSE/Observability/` | Next.js static dashboard — polls `/api/events/recent` |
 
 ## Dashboard Locations
 
@@ -125,9 +127,9 @@ The LifeOS Observatory is the local observability UI -- a Next.js 15.5 static ex
 
 | Item | Value |
 |------|-------|
-| Source | `~/.claude/LIFEOS/PULSE/Observability/` |
-| Build command | `cd ~/.claude/LIFEOS/PULSE/Observability && bun run build` (outputs to `out/`) |
-| Serving mechanism | Direct: `~/.claude/LIFEOS/PULSE/Observability/out` (configured in PULSE.toml `dashboard_dir`) |
+| Source | `${LIFEOS_DIR}/PULSE/Observability/` |
+| Build command | `cd ${LIFEOS_DIR}/PULSE/Observability && bun run build` (outputs to `out/`) |
+| Serving mechanism | Direct: `${LIFEOS_DIR}/PULSE/Observability/out` (configured in PULSE.toml `dashboard_dir`) |
 | URL | `http://localhost:31337/` (served by Pulse observability module) |
 | Process management | Pulse runs under launchd (`com.lifeos.pulse`) with auto-restart. **Always** use `launchctl stop/start com.lifeos.pulse` -- never `kill`. |
 
@@ -243,8 +245,8 @@ All endpoints served by the Pulse daemon's observability module (`Observability/
 
 ### Deployment Checklist
 
-1. Edit source in `~/.claude/LIFEOS/PULSE/Observability/src/`
-2. Build: `cd ~/.claude/LIFEOS/PULSE/Observability && bun run build`
+1. Edit source in `${LIFEOS_DIR}/PULSE/Observability/src/`
+2. Build: `cd ${LIFEOS_DIR}/PULSE/Observability && bun run build`
 3. Restart Pulse: `launchctl stop com.lifeos.pulse && launchctl start com.lifeos.pulse`
 4. Hard refresh browser: Cmd+Shift+R
 
@@ -318,5 +320,5 @@ The gap between "it happened" and "you can see it" is one poll interval, and the
 
 ## See Also
 
-- `~/.claude/LIFEOS/DOCUMENTATION/Memory/CortexContract.md` — Cortex CLI contract, privacy limit, benchmark, and health evidence
-- `~/.claude/LIFEOS/DOCUMENTATION/LifeosSystemArchitecture.md` — Master LifeOS architecture reference
+- `${LIFEOS_DIR}/DOCUMENTATION/Memory/CortexContract.md` — Cortex CLI contract, privacy limit, benchmark, and health evidence
+- `${LIFEOS_DIR}/DOCUMENTATION/LifeosSystemArchitecture.md` — Master LifeOS architecture reference

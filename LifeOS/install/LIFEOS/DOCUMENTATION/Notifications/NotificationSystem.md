@@ -4,11 +4,13 @@ version: 1.4.1
 
 # The Notification System
 
+Path note: `${LIFEOS_DIR}` and `${CLAUDE_CONFIG_DIR}` refer to the active LifeOS runtime/config roots, not specifically a `.claude` installation. Substitute the installed paths when running shell examples.
+
 > Voice is the Life OS speaking. Notifications close the loop's feedback edge: when the system advances the hill-climb (`LIFEOS/DOCUMENTATION/LifeOs/LifeOsThesis.md`), the principal hears it without having to look.
 
 **Voice notifications for LifeOS workflows and task execution.**
 
-> **Infrastructure:** The voice notification endpoint (`http://localhost:31337/notify`) is served by the unified Pulse daemon (`~/.claude/LIFEOS/PULSE/`). Voice is implemented at `~/.claude/LIFEOS/PULSE/VoiceServer/voice.ts` and routed through Pulse -- there is no separate VoiceServer process. One daemon, one port, one launchd plist (`com.lifeos.pulse`).
+> **Infrastructure:** The voice notification endpoint (`http://localhost:31337/notify`) is served by the unified Pulse daemon (`${LIFEOS_DIR}/PULSE/`). Voice is implemented at `${LIFEOS_DIR}/PULSE/VoiceServer/voice.ts` and routed through Pulse -- there is no separate VoiceServer process. Pulse is supervised by Task Scheduler on Windows, launchd on macOS, or systemd on Linux.
 
 > **Pronunciation normalization:** Before any text reaches ElevenLabs it passes through two transforms — `applyPronunciations()` (literal term map from `LIFEOS/USER/PRINCIPAL/PRONUNCIATIONS.json`) wrapped around `disambiguateHomographs()` (`LIFEOS/PULSE/lib/homographs.ts`). The homograph stage exists because ElevenLabs guesses a reading from context and gets some words wrong; the worst offender is "live", where the broadcast/adjective sense (/laɪv/ — "the site is live", "live-verified") otherwise reads as the verb (/lɪv/ — "where you live"). It respells **only** context-matched broadcast occurrences to `lyve`, never a flat substitution, so verb uses ("live freely") stay correct. Adding a new spoken phrasing that reads wrong means adding a context regex, not a global replace. Applied by the VoiceServer (`voice.ts`) so every spoken notification reads identically.
 
@@ -115,7 +117,7 @@ curl -s -X POST http://localhost:31337/notify \
 
 **The DA is the only speaker.** Subagents never emit voice — the DA narrates every completion, so there is no per-subagent voice routing to configure. The `voiceId:`/`voice:` frontmatter in `agents/*.md` has **no consumer in code** (verified 2026-07-27: nothing under `hooks/`, `LIFEOS/TOOLS/`, or `LIFEOS/PULSE/` parses agent frontmatter for voice); it is persona flavor, not configuration, and two agents currently share one ID without consequence.
 
-**Voice config:** canonical in `LIFEOS/USER/CONFIG/LIFEOS_CONFIG.toml` `[da.voices.main]`; hooks read the runtime mirror at `~/.claude/settings.json` → `daidentity.voices.main.voiceId`. The former "Priya (Artist)" row was removed 2026-07-27 — that agent does not exist.
+**Voice config:** canonical in `LIFEOS/USER/CONFIG/LIFEOS_CONFIG.toml` `[da.voices.main]`; hooks read the runtime mirror at `${CLAUDE_CONFIG_DIR}/settings.json` → `daidentity.voices.main.voiceId`. The former "Priya (Artist)" row was removed 2026-07-27 — that agent does not exist.
 
 ---
 
@@ -213,7 +215,7 @@ Notifications are automatically routed based on event type:
 
 ### Configuration
 
-Located in `~/.claude/settings.json`:
+Located in `${CLAUDE_CONFIG_DIR}/settings.json`:
 
 ```json
 {
@@ -277,7 +279,7 @@ Topic name acts as password - use random string for security.
 
 ### Implementation
 
-The notification service is in `~/.claude/hooks/lib/notifications.ts`:
+The notification service is in `${CLAUDE_CONFIG_DIR}/hooks/lib/notifications.ts`:
 
 ```typescript
 import { notify, notifyTaskComplete, notifyBackgroundAgent, notifyError } from './lib/notifications';
@@ -301,7 +303,7 @@ await sendDiscord("Message", { title: "Title", color: 0x00ff00 });
 ## Event Log Channel (events.jsonl)
 
 
-Events are emitted directly from each hook via `fs.appendFileSync` to `~/.claude/LIFEOS/MEMORY/OBSERVABILITY/*.jsonl` — synchronous, fire-and-forget, no shared transport library. This channel is additive — it does not replace any of the notification channels above, and hooks emit events alongside their existing state writes and notifications.
+Events are emitted directly from each hook via `fs.appendFileSync` to `${LIFEOS_DIR}/MEMORY/OBSERVABILITY/*.jsonl` — synchronous, fire-and-forget, no shared transport library. This channel is additive — it does not replace any of the notification channels above, and hooks emit events alongside their existing state writes and notifications.
 
 ---
 

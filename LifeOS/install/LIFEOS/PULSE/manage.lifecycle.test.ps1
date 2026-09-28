@@ -44,6 +44,8 @@ try {
     $wrongScript = $lock | Select-Object *
     $wrongScript.scriptPath = "C:\not-the-owner\pulse.ts"
     Assert-True (-not (Test-ProcessIdentity $wrongScript -AllowStoppedLauncher)) "a reused PID with a different script was accepted"
+    Assert-True (-not (Test-ProcessIdAbsent $PID)) "the current PowerShell process was reported absent"
+    Assert-True (Test-ProcessIdAbsent 2147483647) "a nonexistent PID was reported present"
 
     # Strict service success is stronger than process identity. HTTP 503,
     # missing dashboard assets, and lock/health mismatches all fail; optional
@@ -114,6 +116,54 @@ try {
 
     $script:fixtureHealthInstance = "instance-b"
     Assert-True (-not (Get-InstanceValidation).Ok) "a health/lock instance mismatch was accepted"
+
+    # Offline uninstall may remove only an unchanged, v2 lock whose worker and
+    # launcher PIDs are both provably absent. Exercise the helper using a
+    # temporary lock path; never touch the real runtime state directory.
+    $cleanupRoot = Join-Path $env:TEMP ("lifeos-lock-cleanup-" + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $cleanupRoot -Force | Out-Null
+    $script:lockPath = Join-Path $cleanupRoot "pulse.lock.json"
+    $script:fixtureLock = [pscustomobject]@{
+        schemaVersion = 2; pid = 4242; instanceId = "cleanup-instance"
+        runtimeRoot = $script:lifeosDir; configPath = $script:ConfigPath
+        processStartedAt = "2026-01-01T00:00:00.000Z"; launcherPid = 4343
+    }
+    function Get-PulseLock {
+        if (-not (Test-Path -LiteralPath $script:lockPath)) { return $null }
+        return (Get-Content -Raw -LiteralPath $script:lockPath | ConvertFrom-Json)
+    }
+    $script:recordedProcessesAbsent = $true
+    function Test-ProcessIdAbsent { return $script:recordedProcessesAbsent }
+    try {
+        $script:fixtureLock | ConvertTo-Json | Set-Content -LiteralPath $script:lockPath
+        Assert-True (Remove-OfflineOwnedLock) "a stale owned lock was not removed"
+        Assert-True (-not (Test-Path -LiteralPath $script:lockPath)) "the stale lock remained after safe cleanup"
+
+        $script:fixtureLock | ConvertTo-Json | Set-Content -LiteralPath $script:lockPath
+        $script:recordedProcessesAbsent = $false
+        try { Remove-OfflineOwnedLock | Out-Null; throw "a live recorded PID did not block lock cleanup" } catch {
+            if ($_.Exception.Message -eq "a live recorded PID did not block lock cleanup") { throw }
+        }
+        Assert-True (Test-Path -LiteralPath $script:lockPath) "a lock with a live/uncertain PID was removed"
+
+        $script:recordedProcessesAbsent = $true
+        $foreignLock = $script:fixtureLock | Select-Object *
+        $foreignLock.runtimeRoot = "C:\\Other\\LIFEOS"
+        $foreignLock | ConvertTo-Json | Set-Content -LiteralPath $script:lockPath
+        try { Remove-OfflineOwnedLock | Out-Null; throw "a foreign lock was removed" } catch {
+            if ($_.Exception.Message -eq "a foreign lock was removed") { throw }
+        }
+        Assert-True (Test-Path -LiteralPath $script:lockPath) "a foreign lock was removed"
+
+        $script:fixtureLock | ConvertTo-Json | Set-Content -LiteralPath $script:lockPath
+        New-Item -ItemType File -Path "$($script:lockPath).reclaim" | Out-Null
+        try { Remove-OfflineOwnedLock | Out-Null; throw "an active mutation guard did not block cleanup" } catch {
+            if ($_.Exception.Message -eq "an active mutation guard did not block cleanup") { throw }
+        }
+        Assert-True (Test-Path -LiteralPath $script:lockPath) "a guarded lock was removed"
+    } finally {
+        Remove-Item -LiteralPath $cleanupRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
 
     Write-Output "manage lifecycle helper tests passed"
 } finally {

@@ -35,6 +35,10 @@ jobs:
             LifeOS/install/LIFEOS/PULSE/lib.scheduler.test.ts `
             LifeOS/install/LIFEOS/PULSE/lib/capabilities.test.ts `
             LifeOS/install/LIFEOS/PULSE/lib/instance-lock.test.ts `
+            LifeOS/install/LIFEOS/PULSE/lib/service-template.test.ts `
+            LifeOS/install/LIFEOS/PULSE/lib/posix-process-identity.test.ts `
+            LifeOS/install/LIFEOS/TOOLS/runtime-root-isolation.test.ts `
+            LifeOS/install/LIFEOS/TOOLS/PulseDoctor.test.ts `
             LifeOS/install/LIFEOS/TOOLS/Services.windows.test.ts `
             LifeOS/Tools/InstallEngine.windows.test.ts
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File LifeOS/install/LIFEOS/PULSE/manage.lifecycle.test.ps1
@@ -46,6 +50,7 @@ jobs:
           $root = Join-Path $env:RUNNER_TEMP "LifeOS Pulse CI [main] Root"
           $runtime = Join-Path $root "LIFEOS"
           $configPath = Join-Path $env:RUNNER_TEMP "LifeOS Pulse external config.toml"
+          $fixtureMarker = Join-Path $env:RUNNER_TEMP "LifeOS Pulse scheduled fixture.marker"
           $taskPath = "\LifeOS-Test\"
           $taskName = "Pulse-$env:GITHUB_RUN_ID"
           $manager = Join-Path $runtime "PULSE/manage.ps1"
@@ -53,6 +58,26 @@ jobs:
           New-Item -ItemType Directory -Path $root -Force | Out-Null
           Copy-Item -LiteralPath $source -Destination $runtime -Recurse
           New-Item -ItemType File -Path $configPath -Force | Out-Null
+
+          $fixtureJob = @"
+
+          [[job]]
+          name = "windows-ci-scheduled-fixture"
+          schedule = "* * * * *"
+          type = "script"
+          program = "bun"
+          args = ["run", "checks/windows-ci-fixture.ts", $($fixtureMarker | ConvertTo-Json -Compress)]
+          working_dir = "`${PULSE_DIR}"
+          platforms = ["windows"]
+          output = "log"
+          enabled = true
+          "@
+          Add-Content -LiteralPath (Join-Path $runtime "PULSE/PULSE.toml") -Value $fixtureJob
+          $statePath = Join-Path $runtime "PULSE/state/state.json"
+          New-Item -ItemType Directory -Path (Split-Path -Parent $statePath) -Force | Out-Null
+          $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+          @{ version = 1; jobs = @{ "windows-ci-scheduled-fixture" = @{ lastRun = ($now - 120000); lastResult = "ok"; consecutiveFailures = 0 } }; startedAt = $now } |
+            ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statePath
 
           try {
             $install = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $manager install `
@@ -67,6 +92,10 @@ jobs:
             if ($health.configPath -ne $configPath) { throw "health endpoint lost the explicit config path" }
             $dashboard = Invoke-WebRequest "http://127.0.0.1:31337/" -UseBasicParsing -TimeoutSec 5
             if ($dashboard.StatusCode -ne 200) { throw "dashboard was not served" }
+
+            $fixtureDeadline = (Get-Date).AddSeconds(75)
+            while (-not (Test-Path -LiteralPath $fixtureMarker) -and (Get-Date) -lt $fixtureDeadline) { Start-Sleep -Milliseconds 500 }
+            if (-not (Test-Path -LiteralPath $fixtureMarker)) { throw "the Windows scheduled-job fixture did not write its marker" }
 
             $oldInstance = $health.instanceId
             Stop-Process -Id ([int]$health.pid) -Force

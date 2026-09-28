@@ -255,8 +255,104 @@ function Remove-LockForInstance {
     if ([string]$current.instanceId -ne $InstanceId -or -not (Test-PathEqual $current.runtimeRoot $lifeosDir)) {
         throw "ownership-conflict: refusing to remove a lock whose identity changed"
     }
-    if (Get-Process -Id ([int]$current.pid) -ErrorAction SilentlyContinue) { throw "refusing to remove the lock while its verified process is alive" }
+    if ([int]$current.schemaVersion -eq 2) {
+        # The schema-v2 lock also identifies the supervising launcher. Reuse
+        # guarded, quarantined cleanup so a surviving launcher or concurrent
+        # starter cannot lose its lock.
+        if (-not (Remove-OfflineOwnedLock)) { return }
+        return
+    }
+    if (-not (Test-ProcessIdAbsent ([int]$current.pid))) { throw "refusing to remove the lock while its verified process is alive" }
     Remove-Item -LiteralPath $lockPath -Force
+}
+
+function Test-ProcessIdAbsent {
+    param([int]$ProcessId)
+    if ($ProcessId -le 0) { throw "refusing to check an invalid process id in the Pulse lock" }
+    $process = $null
+    try {
+        $process = [Diagnostics.Process]::GetProcessById($ProcessId)
+        # Force a handle lookup. If the process exists but its identity cannot
+        # be inspected, fail closed rather than treating access trouble as absence.
+        $null = $process.Handle
+        return $false
+    } catch [ArgumentException] {
+        return $true
+    } catch {
+        throw "unable to verify whether Pulse lock process $ProcessId is absent: $($_.Exception.Message)"
+    } finally {
+        if ($process) { $process.Dispose() }
+    }
+}
+
+function Remove-OfflineOwnedLock {
+    if (-not (Test-Path -LiteralPath $lockPath -PathType Leaf)) { return $false }
+    $initial = Get-PulseLock
+    if (-not $initial) { throw "Pulse lock exists but cannot be parsed; preserving it for inspection" }
+    if ([int]$initial.schemaVersion -ne 2 -or -not $initial.instanceId -or
+        -not (Test-PathEqual $initial.runtimeRoot $lifeosDir) -or
+        -not (Test-PathEqual $initial.configPath $ConfigPath)) {
+        throw "ownership-conflict: refusing to remove a stale lock with a foreign or incomplete identity"
+    }
+
+    $guardPath = "$lockPath.reclaim"
+    $quarantinePath = "$lockPath.uninstall-$([Guid]::NewGuid().ToString('N'))"
+    $guardStream = $null
+    $moved = $false
+    try {
+        try {
+            # Match Pulse's exclusive .reclaim guard. A concurrent starter will
+            # wait rather than publish a lock while this one is being removed.
+            $guardStream = [IO.File]::Open($guardPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        } catch {
+            throw "Pulse lock is being mutated; refusing offline cleanup"
+        }
+
+        $current = Get-PulseLock
+        if (-not $current -or [string]$current.instanceId -ne [string]$initial.instanceId -or
+            [int]$current.pid -ne [int]$initial.pid -or
+            [string]$current.processStartedAt -ne [string]$initial.processStartedAt -or
+            [string]$current.runtimeRoot -ne [string]$initial.runtimeRoot -or
+            [string]$current.configPath -ne [string]$initial.configPath) {
+            throw "ownership-conflict: Pulse lock identity changed before offline cleanup"
+        }
+
+        $processIds = @([int]$current.pid)
+        if ($current.launcherPid) { $processIds += [int]$current.launcherPid }
+        foreach ($processId in $processIds) {
+            if (-not (Test-ProcessIdAbsent $processId)) {
+                throw "refusing to remove the Pulse lock while recorded process $processId still exists"
+            }
+        }
+
+        [IO.File]::Move($lockPath, $quarantinePath)
+        $moved = $true
+        $quarantined = Get-Content -Raw -LiteralPath $quarantinePath | ConvertFrom-Json
+        if ([string]$quarantined.instanceId -ne [string]$current.instanceId -or
+            [int]$quarantined.pid -ne [int]$current.pid -or
+            [string]$quarantined.processStartedAt -ne [string]$current.processStartedAt) {
+            throw "ownership-conflict: quarantined Pulse lock identity changed; preserving it"
+        }
+        foreach ($processId in $processIds) {
+            if (-not (Test-ProcessIdAbsent $processId)) {
+                throw "refusing to remove the Pulse lock because recorded process $processId reappeared"
+            }
+        }
+        Remove-Item -LiteralPath $quarantinePath -Force
+        $moved = $false
+        return $true
+    } finally {
+        # Restore the original bytes whenever cleanup did not reach its safe
+        # deletion point. If the lock name was unexpectedly reused, keep the
+        # quarantined copy instead of overwriting a possible successor.
+        if ($moved -and (Test-Path -LiteralPath $quarantinePath) -and -not (Test-Path -LiteralPath $lockPath)) {
+            try { [IO.File]::Move($quarantinePath, $lockPath) } catch { }
+        }
+        if ($guardStream) {
+            $guardStream.Dispose()
+            Remove-Item -LiteralPath $guardPath -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Assert-ReplacementPrerequisites {
@@ -487,9 +583,10 @@ try {
                 Stop-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath -ErrorAction SilentlyContinue
             }
             if ($validation.Task) { Unregister-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath -Confirm:$false }
+            $removedOfflineLock = if (-not $validation.Responding) { Remove-OfflineOwnedLock } else { $false }
             Remove-OwnedLegacyTask
             if (Test-Path -LiteralPath $shortcutPath) { Remove-Item -LiteralPath $shortcutPath -Force }
-            $result = [ordered]@{ ok = $true; command = $Command; removedTask = [bool]$validation.Task; preservedRuntime = $pulseDir; preservedUserData = (Join-Path $lifeosDir "USER") }
+            $result = [ordered]@{ ok = $true; command = $Command; removedTask = [bool]$validation.Task; removedOfflineLock = [bool]$removedOfflineLock; preservedRuntime = $pulseDir; preservedUserData = (Join-Path $lifeosDir "USER") }
         }
     }
     Write-Result $result

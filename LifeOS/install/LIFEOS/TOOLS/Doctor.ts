@@ -41,6 +41,8 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, readdirS
 import { join, basename } from 'path';
 import { createHash, randomBytes } from 'crypto';
 import { findExecutable, resolveRuntimePaths } from "./RuntimePaths.ts";
+import { loadConfig } from "../PULSE/lib.ts";
+import { pulseLifecycleFailure, unsupportedWindowsJobs } from "./PulseDoctor.ts";
 
 const RUNTIME_PATHS = resolveRuntimePaths();
 const HOME = RUNTIME_PATHS.home;
@@ -286,20 +288,24 @@ const CAPS: CapSpec[] = [
       ]);
       let parsed: any = null;
       try { parsed = JSON.parse(status.out); } catch { /* detail below */ }
-      if (!parsed?.taskOwned) return { ok: false, detail: `scheduled task is missing or unowned (${parsed?.task ?? 'unknown'})` };
-      if (!parsed?.responding || !parsed?.instanceId) return { ok: false, detail: 'task is owned but /healthz has no matching live instance' };
-      if (!parsed?.lockOwned) return { ok: false, detail: 'Pulse responds but its ownership lock is missing or belongs to another root' };
+      const lifecycleFailure = pulseLifecycleFailure(parsed, {
+        configRoot: RUNTIME_PATHS.configRoot,
+        runtimeRoot: RUNTIME_PATHS.lifeosDir,
+        configPath: RUNTIME_PATHS.configPath,
+      });
+      if (lifecycleFailure) return { ok: false, detail: lifecycleFailure };
 
       const ffplay = findExecutable('ffplay') ?? process.env.LIFEOS_FFPLAY_PATH;
       const shortcut = join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'LifeOS Pulse.lnk');
       const userConfig = join(RUNTIME_PATHS.userDir, 'CONFIG', 'PULSE.user.toml');
-      if (existsSync(userConfig)) {
-        const raw = readFileSync(userConfig, 'utf8');
-        const ambiguous = raw.includes('command =') && !raw.includes('shell = "powershell"');
-        if (ambiguous) return { ok: false, detail: 'PULSE.user.toml has a legacy string command without shell = "powershell"' };
+      const config = await loadConfig(RUNTIME_PATHS.pulseDir, userConfig);
+      const unsupported = unsupportedWindowsJobs(config.jobs);
+      if (unsupported.length) {
+        const detail = unsupported.map(({ name, reason }) => `${name}: ${reason}`).join('; ');
+        return { ok: false, detail: `enabled scheduler job(s) unsupported on Windows: ${detail}` };
       }
       const optional = [!ffplay ? 'ffplay missing (voice degraded)' : null, !existsSync(shortcut) ? 'toast shortcut missing' : null].filter(Boolean);
-      return { ok: true, detail: `task, dashboard, lock, and structured scheduler live${optional.length ? `; ${optional.join('; ')}` : ''}` };
+      return { ok: true, detail: `task, process identity, lock, dashboard, and enabled scheduler jobs are healthy${optional.length ? `; ${optional.join('; ')}` : ''}` };
     },
     fixCmd: 'powershell -ExecutionPolicy Bypass -File <configRoot>/LIFEOS/PULSE/manage.ps1 repair  (optional voice: winget install --id Gyan.FFmpeg --exact)',
   },
