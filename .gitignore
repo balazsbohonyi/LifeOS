@@ -48,6 +48,8 @@ tmp/
 temp/
 *.tmp
 LifeOS/install/LIFEOS/PULSE/state/pulse.lock.json
+LifeOS/install/LIFEOS/PULSE/state/pulse.lock.json.reclaim
+LifeOS/install/LIFEOS/PULSE/state/.pulse-lock-*.tmp
 
 # Build outputs
 dist/

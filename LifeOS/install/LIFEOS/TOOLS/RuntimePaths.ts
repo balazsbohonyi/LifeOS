@@ -47,6 +47,11 @@ export interface RuntimePaths {
   configPath: string;
 }
 
+export type RuntimeEnvironmentTarget = Pick<
+  RuntimePathEnvironment,
+  "HOME" | "CLAUDE_CONFIG_DIR" | "LIFEOS_DIR" | "LIFEOS_CONFIG_PATH" | "PULSE_DIR"
+>;
+
 function absolute(path: string, base: string): string {
   return normalize(isAbsolute(path) ? path : resolve(base, path));
 }
@@ -71,7 +76,7 @@ function defaultToolDir(): string {
  */
 export function resolveRuntimePaths(options: ResolveRuntimePathOptions = {}): RuntimePaths {
   const env = options.env ?? process.env;
-  const home = normalize(options.home ?? env.HOME ?? env.USERPROFILE ?? homedir());
+  const home = absolute(options.home ?? env.HOME ?? env.USERPROFILE ?? homedir(), process.cwd());
   const toolDir = absolute(options.toolDir ?? defaultToolDir(), home);
   const deployed = deployedLifeosDir(toolDir);
 
@@ -112,6 +117,25 @@ export function resolveRuntimePaths(options: ResolveRuntimePathOptions = {}): Ru
     envPath: join(configRoot, ".env"),
     configPath,
   };
+}
+
+/**
+ * Publish one canonical path set for all modules and child processes.
+ *
+ * Assignment is deliberately unconditional: a relative/raw override may have
+ * selected the runtime, but downstream consumers must never resolve that raw
+ * value a second time from a different working directory.
+ */
+export function publishRuntimeEnvironment(
+  paths: RuntimePaths,
+  env: RuntimeEnvironmentTarget = process.env,
+): RuntimeEnvironmentTarget {
+  env.HOME = paths.home;
+  env.CLAUDE_CONFIG_DIR = paths.configRoot;
+  env.LIFEOS_DIR = paths.lifeosDir;
+  env.LIFEOS_CONFIG_PATH = paths.configPath;
+  env.PULSE_DIR = paths.pulseDir;
+  return env;
 }
 
 export interface FindExecutableOptions {

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, normalize } from "node:path";
-import { findExecutable, resolveRuntimePaths } from "./RuntimePaths";
+import { isAbsolute, join, normalize } from "node:path";
+import { findExecutable, publishRuntimeEnvironment, resolveRuntimePaths } from "./RuntimePaths";
 
 describe("resolveRuntimePaths", () => {
   test("uses a deployed .codex runtime without HOME", () => {
@@ -49,6 +49,38 @@ describe("resolveRuntimePaths", () => {
     const home = normalize("C:/Users/Legacy");
     const paths = resolveRuntimePaths({ env: {}, home, toolDir: normalize("D:/source/tools") });
     expect(paths.lifeosDir).toBe(join(home, ".claude", "LIFEOS"));
+  });
+
+  test("resolves relative overrides once and publishes only canonical absolute roots", () => {
+    const home = normalize("C:/Users/Portable User");
+    const paths = resolveRuntimePaths({
+      env: {
+        HOME: home,
+        CLAUDE_CONFIG_DIR: "profiles/codex",
+        LIFEOS_CONFIG_PATH: "private/LIFEOS_CONFIG.toml",
+      },
+      toolDir: normalize("D:/payload/tools"),
+    });
+    const inherited = {
+      HOME: "stale-home",
+      CLAUDE_CONFIG_DIR: "profiles/codex",
+      LIFEOS_DIR: "stale-lifeos",
+      LIFEOS_CONFIG_PATH: "private/LIFEOS_CONFIG.toml",
+      PULSE_DIR: "stale-pulse",
+    };
+
+    publishRuntimeEnvironment(paths, inherited);
+
+    expect(paths.configRoot).toBe(join(home, "profiles", "codex"));
+    expect(paths.configPath).toBe(join(home, "private", "LIFEOS_CONFIG.toml"));
+    expect(inherited).toEqual({
+      HOME: home,
+      CLAUDE_CONFIG_DIR: paths.configRoot,
+      LIFEOS_DIR: paths.lifeosDir,
+      LIFEOS_CONFIG_PATH: paths.configPath,
+      PULSE_DIR: paths.pulseDir,
+    });
+    for (const value of Object.values(inherited)) expect(isAbsolute(value)).toBe(true);
   });
 
   test("keeps the canonical USER path usable through a Windows directory junction", () => {

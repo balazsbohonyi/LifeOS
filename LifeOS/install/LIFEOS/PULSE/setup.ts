@@ -18,6 +18,7 @@ import { join, resolve } from "path"
 import { copyFileSync, existsSync, mkdirSync } from "fs"
 import { PULSE_BASE } from "./endpoint"
 import { findExecutable, resolveRuntimePaths } from "../TOOLS/RuntimePaths.ts"
+import { renderPulseServiceTemplate } from "./lib/service-template.ts"
 
 const RUNTIME = resolveRuntimePaths()
 const HOME = RUNTIME.home
@@ -323,6 +324,7 @@ async function installService(force = false): Promise<void> {
       "-File", manager,
       "install",
       "-ConfigRoot", RUNTIME.configRoot,
+      "-ConfigPath", RUNTIME.configPath,
       "-BunPath", bun,
       "-Json",
     ], { stdout: "pipe", stderr: "pipe", cwd: PULSE_DIR })
@@ -342,17 +344,18 @@ async function installService(force = false): Promise<void> {
 
   const plistSrc = join(PULSE_DIR, "com.lifeos.pulse.plist")
   const plistDst = join(HOME, "Library", "LaunchAgents", "com.lifeos.pulse.plist")
+  const bun = findExecutable("bun")
 
   if (!existsSync(plistSrc)) {
     warn("com.lifeos.pulse.plist not found — create it manually")
     return
   }
+  if (!bun) throw new Error("Bun was not found; install Bun before provisioning Pulse")
 
-  // Read template, substitute __HOME__ with actual user home, write to LaunchAgents.
-  // The source plist ships as a template (no hardcoded user paths) so the system
-  // file is deny-list clean; the installed copy is per-user materialized.
+  // Materialize every selected root into the launch agent. setup.ts and
+  // manage.sh share the same renderer so custom/.codex installs cannot drift.
   const template = await Bun.file(plistSrc).text()
-  const materialized = template.split("__HOME__").join(HOME)
+  const materialized = renderPulseServiceTemplate(template, "launchd", { runtime: RUNTIME, bunPath: bun })
   const written = await writeConfigPreserving(plistDst, materialized, {
     force,
     onOverwrite: ({ backupPath }) =>

@@ -280,7 +280,10 @@ const CAPS: CapSpec[] = [
       const manager = join(RUNTIME_PATHS.pulseDir, 'manage.ps1');
       const powershell = findExecutable('powershell');
       if (!existsSync(manager) || !powershell) return { ok: false, detail: 'manage.ps1 or Windows PowerShell is missing' };
-      const status = await run([powershell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', manager, 'status', '-Json', '-ConfigRoot', CONFIG_ROOT]);
+      const status = await run([
+        powershell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', manager, 'status', '-Json',
+        '-ConfigRoot', CONFIG_ROOT, '-ConfigPath', RUNTIME_PATHS.configPath,
+      ]);
       let parsed: any = null;
       try { parsed = JSON.parse(status.out); } catch { /* detail below */ }
       if (!parsed?.taskOwned) return { ok: false, detail: `scheduled task is missing or unowned (${parsed?.task ?? 'unknown'})` };

@@ -203,7 +203,7 @@ function validateAndNormalize(raw: unknown, path: string): LifeosConfig {
     },
     paths: {
       userDir: expandHome(
-        root.paths?.userDir ?? root.paths?.user_dir ?? resolve(DEFAULT_HOME, ".claude/LIFEOS/USER"),
+        root.paths?.userDir ?? root.paths?.user_dir ?? RUNTIME_PATHS.userDir,
       ),
       projectsDir: expandHome(
         root.paths?.projectsDir ?? root.paths?.projects_dir ?? resolve(DEFAULT_HOME, "Projects"),

@@ -2,7 +2,8 @@
 /**
  * SessionHarvester - Extract learnings from Claude Code session transcripts
  *
- * Harvests insights from ~/.claude/projects/ sessions and writes to LEARNING/
+ * Harvests insights from the selected harness root's projects/ sessions and
+ * writes to that same installation's MEMORY/LEARNING/ tree.
  *
  * Commands:
  *   --recent N     Harvest from N most recent sessions (default: 10)
@@ -24,19 +25,21 @@ import * as fs from "fs";
 import * as path from "path";
 import { getLearningCategory, isLearningCapture } from "../../hooks/lib/learning-utils";
 import { ingestCaptureEnvelope } from "./CaptureEnvelope";
-import { homedir } from "node:os";
+import { publishRuntimeEnvironment, resolveRuntimePaths } from "./RuntimePaths";
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
-const CLAUDE_DIR = path.join(homedir(), ".claude");
-// Derive the project slug dynamically from CLAUDE_DIR (works on macOS and Linux)
-// macOS: ${HOME}/.claude → ${HARNESS_USER_DIR}
-// Linux: ${HOME}/.claude → ${HARNESS_USER_DIR}
-const CWD_SLUG = CLAUDE_DIR.replace(/[\/\.]/g, "-");
-const PROJECTS_DIR = path.join(CLAUDE_DIR, "projects", CWD_SLUG);
-const LEARNING_DIR = path.join(CLAUDE_DIR, "LIFEOS", "MEMORY", "LEARNING");
+const RUNTIME_PATHS = resolveRuntimePaths();
+publishRuntimeEnvironment(RUNTIME_PATHS);
+const CONFIG_ROOT = RUNTIME_PATHS.configRoot;
+// Claude/Codex transcript directories encode the working directory as a flat
+// slug. Handle both POSIX and Windows separators so a native Windows install
+// never falls through to a different harness root.
+const CWD_SLUG = CONFIG_ROOT.replace(/[\\/.:]/g, "-");
+const PROJECTS_DIR = path.join(CONFIG_ROOT, "projects", CWD_SLUG);
+const LEARNING_DIR = path.join(RUNTIME_PATHS.memoryDir, "LEARNING");
 
 // Patterns indicating learning moments in conversations
 const CORRECTION_PATTERNS = [
@@ -414,7 +417,7 @@ function confidenceIcon(c: number): string {
   return "\u{1F534}";                  // red circle
 }
 
-const HARVEST_QUEUE_DIR = path.join(CLAUDE_DIR, "LIFEOS", "MEMORY", "KNOWLEDGE", "_harvest-queue");
+const HARVEST_QUEUE_DIR = path.join(RUNTIME_PATHS.memoryDir, "KNOWLEDGE", "_harvest-queue");
 
 function writeToQueue(mem: MinedMemory): string {
   if (!fs.existsSync(HARVEST_QUEUE_DIR)) {

@@ -366,7 +366,7 @@ function deployViaServices(component: LaunchdComponent, ctx: Ctx): ComponentResu
         HOME: ctx.home,
         CLAUDE_CONFIG_DIR: ctx.configRoot,
         LIFEOS_DIR: ctx.lifeosDir,
-        LIFEOS_CONFIG_PATH: join(ctx.lifeosDir, "USER", "CONFIG", "LIFEOS_CONFIG.toml"),
+        LIFEOS_CONFIG_PATH: process.env.LIFEOS_CONFIG_PATH ?? join(ctx.lifeosDir, "USER", "CONFIG", "LIFEOS_CONFIG.toml"),
         LIFEOS_BUN_PATH: ctx.bun,
       },
     }).toString();

@@ -99,6 +99,6 @@ namespace LifeOS.Windows {
 '@
 
 $directory = Split-Path -Parent $ShortcutPath
-New-Item -ItemType Directory -Path $directory -Force | Out-Null
+[IO.Directory]::CreateDirectory($directory) | Out-Null
 $target = Join-Path $env:WINDIR "explorer.exe"
 [LifeOS.Windows.ToastShortcut]::Create($ShortcutPath, $AppUserModelId, $target, "http://127.0.0.1:31337/", $env:USERPROFILE)

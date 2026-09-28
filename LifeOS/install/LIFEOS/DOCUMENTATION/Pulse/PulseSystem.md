@@ -213,7 +213,7 @@ enabled = true
 
 ### Script Jobs (`type = "script"`)
 
-Run a shell command via `bash -c`. The working directory is `~/.claude/Pulse/`. Environment variables from `~/.claude/.env` are available. The process has a 60-second timeout, enforced by `collectProc()` (public issue #1546): SIGTERM at expiry, SIGKILL 10s later, and a rejecting deadline 10s after that which drains stdout/stderr under `Promise.race` — a grandchild holding the pipe or a SIGTERM-immune child can no longer freeze the sequential cron loop.
+Run a shell command via `bash -c`. The working directory is the selected runtime's `LIFEOS/PULSE/` directory. Environment variables from the selected config root's `.env` are available. The process has a 60-second timeout, enforced by `collectProc()` (public issue #1546): SIGTERM at expiry, SIGKILL 10s later, and a rejecting deadline 10s after that which drains stdout/stderr under `Promise.race` — a grandchild holding the pipe or a SIGTERM-immune child can no longer freeze the sequential cron loop.
 
 Cost: $0. All computation is local or uses free APIs.
 
@@ -342,9 +342,10 @@ Pulse ships a supervisor unit for both supported platforms. On macOS it is manag
 | Start on login | `RunAtLoad = true` | `WantedBy=default.target` | Starts with the user session |
 | Restart on crash | `KeepAlive = true` | `Restart=on-failure` | Auto-restarts the daemon |
 | Restart throttle | `ThrottleInterval = 30` | `RestartSec=30` | Minimum 30 seconds between restart attempts |
-| Working directory | `WorkingDirectory` | `WorkingDirectory=` | `~/.claude/LIFEOS/PULSE` |
+| Working directory | `WorkingDirectory` | `WorkingDirectory=` | Selected runtime's absolute `LIFEOS/PULSE` path |
 
-The systemd unit is templated — `__BUN_PATH__` and `__HOME__` are substituted at install time.
+The systemd unit is templated — `manage.sh` materializes absolute Bun, home,
+config-root, LifeOS, config-file, Pulse, and log paths at install time.
 
 Logs go to `LIFEOS/PULSE/logs/pulse-stdout.log` and `pulse-stderr.log` under both supervisors.
 

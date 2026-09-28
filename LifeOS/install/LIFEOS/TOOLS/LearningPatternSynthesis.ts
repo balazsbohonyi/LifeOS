@@ -36,21 +36,23 @@ import { parseArgs } from "util";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
-import { homedir } from "node:os";
+import { pathToFileURL } from "node:url";
 import { getPrincipalName } from "../../hooks/lib/identity";
 import {
   FRUSTRATION_PATTERNS, SUCCESS_PATTERNS,
   collectObservabilityClusters, readPatchRegistry,
   type ObservabilityCluster,
 } from "./RecurrenceLedger";
+import { publishRuntimeEnvironment, resolveRuntimePaths } from "./RuntimePaths";
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
-const CLAUDE_DIR = path.join(homedir(), ".claude");
-const LIFEOS_DIR = path.join(CLAUDE_DIR, "LIFEOS");
-const MEMORY_DIR = path.join(LIFEOS_DIR, "MEMORY");
+const RUNTIME_PATHS = resolveRuntimePaths();
+publishRuntimeEnvironment(RUNTIME_PATHS);
+const CONFIG_ROOT = RUNTIME_PATHS.configRoot;
+const MEMORY_DIR = RUNTIME_PATHS.memoryDir;
 const LEARNING_DIR = path.join(MEMORY_DIR, "LEARNING");
 const RATINGS_FILE = path.join(LEARNING_DIR, "SIGNALS", "ratings.jsonl");
 // v2 (2026-07-13): observability streams are now an intake source via
@@ -63,7 +65,7 @@ const HYPOTHESES_DIR = path.join(FRAMES_DIR, "_hypotheses");
 const HYPOTHESES_ARCHIVE_DIR = path.join(HYPOTHESES_DIR, "_archive");
 const HYPOTHESES_STATE_FILE = path.join(HYPOTHESES_DIR, ".state.json");
 const DERIVER_LOG = path.join(MEMORY_DIR, "OBSERVABILITY", "deriver.log");
-const PENDING_DIR = path.join(CLAUDE_DIR, "test", "regression", "pending");
+const PENDING_DIR = path.join(CONFIG_ROOT, "test", "regression", "pending");
 
 // Deriver doctrine — non-negotiable floors
 const HYPO_CONFIDENCE_FLOOR = 0.6;
@@ -591,7 +593,7 @@ function buildObservabilityCandidate(
 const HOOK_REF_RE = /^hooks\/[A-Za-z0-9_]+\.hook\.ts$/;
 
 function hookInventory(): string {
-  const hooksDir = path.join(CLAUDE_DIR, "hooks");
+  const hooksDir = path.join(CONFIG_ROOT, "hooks");
   const hooks = fs.existsSync(hooksDir)
     ? fs.readdirSync(hooksDir).filter(f => f.endsWith(".hook.ts")).sort()
     : [];
@@ -604,7 +606,7 @@ function hookInventory(): string {
 function validateDraftedFixture(raw: any, log: string[], classId: string): any | null {
   if (!raw || typeof raw !== "object") { log.push(`fixture-not-object: ${classId}`); return null; }
   if (raw.mode !== "stop-hook") { log.push(`fixture-bad-mode: ${classId} — ${raw.mode}`); return null; }
-  if (typeof raw.hook !== "string" || !HOOK_REF_RE.test(raw.hook) || !fs.existsSync(path.join(CLAUDE_DIR, raw.hook))) {
+  if (typeof raw.hook !== "string" || !HOOK_REF_RE.test(raw.hook) || !fs.existsSync(path.join(CONFIG_ROOT, raw.hook))) {
     log.push(`fixture-bad-hook: ${classId} — ${JSON.stringify(raw.hook)}`); return null;
   }
   if (raw.expect !== "block" && raw.expect !== "pass") { log.push(`fixture-bad-expect: ${classId} — ${raw.expect}`); return null; }
@@ -626,12 +628,12 @@ export async function proposeHealingFixture(c: HypothesisCandidate, log: string[
   // The hook-replay harness lives in test/, which does not ship in the public
   // payload — degrade gracefully instead of crashing the deriver on installs
   // without it (Forge 7.10.0 audit finding, dangling-dynamic-import class).
-  const replayPath = new URL("../../test/lib/hook-replay.ts", import.meta.url).pathname;
+  const replayPath = path.join(CONFIG_ROOT, "test", "lib", "hook-replay.ts");
   if (!fs.existsSync(replayPath)) {
     log.push("hook-replay harness not present in this install — skipping healing-fixture proposal");
     return null;
   }
-  const { runFixture } = await import("../../test/lib/hook-replay");
+  const { runFixture } = await import(pathToFileURL(replayPath).href);
   const evidence = [
     `Failure class: ${c.class_id}`,
     `Recurrence: ${c.cluster_size} events`,

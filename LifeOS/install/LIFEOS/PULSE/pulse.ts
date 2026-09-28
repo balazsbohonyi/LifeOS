@@ -16,10 +16,10 @@
 import { isAbsolute, join } from "path"
 import { existsSync, mkdirSync, readFileSync } from "fs"
 import { loadLifeosConfig } from "../TOOLS/LifeosConfig"
-import { resolveRuntimePaths } from "../TOOLS/RuntimePaths.ts"
+import { publishRuntimeEnvironment, resolveRuntimePaths } from "../TOOLS/RuntimePaths.ts"
 import { isLoopbackHostHeader } from "./lib/host-guard.ts"
 import { buildCapabilities } from "./lib/capabilities.ts"
-import { acquireInstanceLock, type InstanceLockHandle } from "./lib/instance-lock.ts"
+import { acquireInstanceLock, INSTANCE_LOCK_SCHEMA_VERSION, type InstanceLockHandle } from "./lib/instance-lock.ts"
 
 // ── Load .env before anything else ──
 
@@ -27,14 +27,17 @@ const RUNTIME_PATHS = resolveRuntimePaths()
 const HOME = RUNTIME_PATHS.home
 const LIFEOS_DIR = RUNTIME_PATHS.lifeosDir
 const PULSE_DIR = RUNTIME_PATHS.pulseDir
+const CONFIG_PATH = RUNTIME_PATHS.configPath
+const PULSE_SCRIPT_PATH = join(PULSE_DIR, "pulse.ts")
+const PROCESS_STARTED_AT = new Date(Date.now() - process.uptime() * 1000).toISOString()
+const LAUNCHER_PID = Number(process.env.PULSE_LAUNCHER_PID ?? process.ppid)
+const LAUNCHER_EXECUTABLE_PATH = process.env.PULSE_LAUNCHER_EXECUTABLE_PATH ?? ""
+const LAUNCHER_SCRIPT_PATH = process.env.PULSE_LAUNCHER_SCRIPT_PATH ?? ""
+const LAUNCHER_STARTED_AT = process.env.PULSE_LAUNCHER_STARTED_AT ?? ""
 
 // Child tools inherit explicit roots. This is essential in Task Scheduler and
 // desktop sessions, where HOME/PATH can differ from an interactive terminal.
-process.env.HOME ||= HOME
-process.env.LIFEOS_DIR ||= LIFEOS_DIR
-process.env.CLAUDE_CONFIG_DIR ||= RUNTIME_PATHS.configRoot
-process.env.LIFEOS_CONFIG_PATH ||= RUNTIME_PATHS.configPath
-process.env.PULSE_DIR ||= PULSE_DIR
+publishRuntimeEnvironment(RUNTIME_PATHS)
 
 const envPath = RUNTIME_PATHS.envPath
 try {
@@ -655,9 +658,18 @@ function buildHealthResponse(state: DaemonState, config: PulseConfig): Response 
     reasons,
     service: "pulse",
     instanceId: INSTANCE_ID,
+    lockSchemaVersion: INSTANCE_LOCK_SCHEMA_VERSION,
     runtimeRoot: LIFEOS_DIR,
+    configPath: CONFIG_PATH,
     platform: process.platform,
     pid: process.pid,
+    executablePath: process.execPath,
+    scriptPath: PULSE_SCRIPT_PATH,
+    processStartedAt: PROCESS_STARTED_AT,
+    launcherPid: LAUNCHER_PID,
+    launcherExecutablePath: LAUNCHER_EXECUTABLE_PATH,
+    launcherScriptPath: LAUNCHER_SCRIPT_PATH,
+    launcherStartedAt: LAUNCHER_STARTED_AT,
     port: config.port,
     startedAt: new Date(state.startedAt).toISOString(),
     uptime: Math.round((Date.now() - state.startedAt) / 1000),
@@ -674,9 +686,18 @@ async function main() {
   // Pulse. An exclusive lock identifies the PID, instance, and owning root.
   mkdirSync(join(PULSE_DIR, "state"), { recursive: true })
   instanceLock = acquireInstanceLock(LOCK_PATH, {
+    schemaVersion: INSTANCE_LOCK_SCHEMA_VERSION,
     pid: process.pid,
     instanceId: INSTANCE_ID,
     runtimeRoot: LIFEOS_DIR,
+    configPath: CONFIG_PATH,
+    executablePath: process.execPath,
+    scriptPath: PULSE_SCRIPT_PATH,
+    processStartedAt: PROCESS_STARTED_AT,
+    launcherPid: LAUNCHER_PID,
+    launcherExecutablePath: LAUNCHER_EXECUTABLE_PATH,
+    launcherScriptPath: LAUNCHER_SCRIPT_PATH,
+    launcherStartedAt: LAUNCHER_STARTED_AT,
     startedAt: new Date().toISOString(),
   })
   await Bun.write(PID_PATH, String(process.pid))

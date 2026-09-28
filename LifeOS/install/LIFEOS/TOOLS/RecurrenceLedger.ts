@@ -32,11 +32,12 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { homedir } from "os";
+import { resolveRuntimePaths } from "./RuntimePaths";
 
-// ── Paths (LIFEOS_DIR override mirrors the hook/test convention) ────────────
-const LIFEOS_DIR = process.env.LIFEOS_DIR ?? path.join(homedir(), ".claude", "LIFEOS");
-const MEMORY_DIR = path.join(LIFEOS_DIR, "MEMORY");
+// ── Paths ───────────────────────────────────────────────────────────────────
+// Keep the ledger on the same selected install as its synthesis caller. The
+// resolver preserves ~/.claude when there is no explicit/deployed root.
+const MEMORY_DIR = resolveRuntimePaths().memoryDir;
 const OBS_DIR = path.join(MEMORY_DIR, "OBSERVABILITY");
 const FAILURES_DIR = path.join(MEMORY_DIR, "LEARNING", "FAILURES");
 const PATCHES_DIR = path.join(MEMORY_DIR, "LEARNING", "PATCHES");

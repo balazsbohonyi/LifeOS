@@ -7,27 +7,35 @@
     <string>com.lifeos.pulse</string>
     <key>ProgramArguments</key>
     <array>
-        <string>__BUN_PATH__</string>
+        <string>__BUN_PATH_XML__</string>
         <string>run</string>
-        <string>pulse.ts</string>
+        <string>__PULSE_SCRIPT_XML__</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>__HOME__/.claude/LIFEOS/PULSE</string>
+    <string>__PULSE_DIR_XML__</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>HOME</key>
-        <string>__HOME__</string>
+        <string>__HOME_XML__</string>
+        <key>CLAUDE_CONFIG_DIR</key>
+        <string>__CONFIG_ROOT_XML__</string>
+        <key>LIFEOS_DIR</key>
+        <string>__LIFEOS_DIR_XML__</string>
+        <key>LIFEOS_CONFIG_PATH</key>
+        <string>__LIFEOS_CONFIG_PATH_XML__</string>
+        <key>PULSE_DIR</key>
+        <string>__PULSE_DIR_XML__</string>
         <key>PATH</key>
-        <string>__HOME__/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>__PATH_XML__</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>__HOME__/.claude/LIFEOS/PULSE/logs/pulse-stdout.log</string>
+    <string>__STDOUT_PATH_XML__</string>
     <key>StandardErrorPath</key>
-    <string>__HOME__/.claude/LIFEOS/PULSE/logs/pulse-stderr.log</string>
+    <string>__STDERR_PATH_XML__</string>
     <key>ThrottleInterval</key>
     <integer>30</integer>
 </dict>

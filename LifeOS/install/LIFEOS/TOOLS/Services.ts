@@ -237,7 +237,7 @@ function findPlistLinux(label: string): { path: string; installed: boolean } | n
   }
   // Not-yet-installed source: most Install*.ts ship a `.template` (placeholders
   // substituted at install time); manage.sh instead keeps pulse's systemd unit
-  // as a bare `.service` in PULSE/ (its own __HOME__/__BUN_PATH__ sed step) —
+  // as a bare `.service` in PULSE/ (manage.sh materializes its selected roots) —
   // the same dual pattern findPlistDarwin already handles on the plist side.
   for (const ext of ["timer", "path", "service"]) {
     for (const base of [TOOLS, PULSE, join(PULSE, "MenuBar"), join(PULSE, "Conduit"), join(LIFEOS, "ATLAS")]) {
@@ -299,18 +299,70 @@ export function cadenceOf(unitPath: string): string {
 function runWindowsPulse(command: "install" | "uninstall"): { code: number; out: string } {
   const powershell = findExecutable("powershell") ?? "powershell.exe";
   const manager = join(PULSE, "manage.ps1");
-  const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", manager, command, "-Json", "-ConfigRoot", CLAUDE];
+  const args = [
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", manager, command, "-Json",
+    "-ConfigRoot", CLAUDE, "-ConfigPath", RUNTIME_PATHS.configPath,
+  ];
   if (command === "install") {
     const bun = findExecutable("bun");
     if (!bun) return { code: 1, out: "Bun executable not found" };
     args.push("-BunPath", bun);
   }
   try {
-    const out = execFileSync(powershell, args, { encoding: "utf8", windowsHide: true, timeout: 120_000 });
-    return { code: 0, out: out.trim() };
+    const out = execFileSync(powershell, args, { encoding: "utf8", windowsHide: true, timeout: 120_000 }).trim();
+    const lines = out.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
+    let result: WindowsPulseLifecycleResult | null = null;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try { result = JSON.parse(lines[i]) as WindowsPulseLifecycleResult; break; } catch { /* find the manager's JSON line */ }
+    }
+    const validation = validateWindowsPulseLifecycleResult(command, result, LIFEOS, RUNTIME_PATHS.configPath);
+    return validation.ok ? { code: 0, out } : { code: 1, out: `${out}\n${validation.reason}`.trim() };
   } catch (err: any) {
     return { code: typeof err?.status === "number" ? err.status : 1, out: String(err?.stdout || err?.stderr || err?.message || err).trim() };
   }
+}
+
+export interface WindowsPulseLifecycleResult {
+  ok?: boolean;
+  runtimeRoot?: string;
+  configPath?: string;
+  taskOwned?: boolean;
+  taskRunning?: boolean;
+  taskConfigured?: boolean;
+  lockOwned?: boolean;
+  responding?: boolean;
+  dashboardAvailable?: boolean;
+  identityAgreement?: boolean;
+  processOwned?: boolean;
+  instanceId?: string | null;
+  removedTask?: boolean;
+}
+
+function sameResolvedPath(left: string | undefined, right: string): boolean {
+  if (!left) return false;
+  const canonical = (value: string) => value.replace(/[\\/]+/gu, "\\").replace(/\\$/u, "").toLowerCase();
+  return canonical(left) === canonical(right);
+}
+
+/** A zero exit code is not lifecycle evidence; validate the manager contract. */
+export function validateWindowsPulseLifecycleResult(
+  command: "install" | "uninstall",
+  result: WindowsPulseLifecycleResult | null,
+  expectedRuntimeRoot: string,
+  expectedConfigPath: string,
+): { ok: boolean; reason: string } {
+  if (!result?.ok) return { ok: false, reason: "Pulse manager did not return ok=true" };
+  if (command === "uninstall") return { ok: true, reason: "uninstall confirmed" };
+  const requiredBooleans: Array<keyof WindowsPulseLifecycleResult> = [
+    "taskOwned", "taskRunning", "taskConfigured", "lockOwned", "responding",
+    "dashboardAvailable", "identityAgreement", "processOwned",
+  ];
+  const missing = requiredBooleans.filter((field) => result[field] !== true);
+  if (missing.length) return { ok: false, reason: `Pulse lifecycle evidence failed: ${missing.join(", ")}` };
+  if (!sameResolvedPath(result.runtimeRoot, expectedRuntimeRoot)) return { ok: false, reason: "Pulse manager reported a different runtime root" };
+  if (!sameResolvedPath(result.configPath, expectedConfigPath)) return { ok: false, reason: "Pulse manager reported a different config path" };
+  if (!result.instanceId) return { ok: false, reason: "Pulse manager omitted the instance ID" };
+  return { ok: true, reason: "strict lifecycle evidence confirmed" };
 }
 
 // CLI dispatch runs only when invoked directly. Pulse's `scheduled` module

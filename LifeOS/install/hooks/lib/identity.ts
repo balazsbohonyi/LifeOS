@@ -22,11 +22,10 @@ import {
   type LifeosDa,
   type LifeosPrincipal,
 } from '../../LIFEOS/TOOLS/LifeosConfig';
-import { homedir } from "node:os";
+import { resolveRuntimePaths } from '../../LIFEOS/TOOLS/RuntimePaths';
 
-// HOME ?? USERPROFILE: Windows defines only the latter (public issue #1694, @dissembler21-png)
-const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir();
-const SETTINGS_PATH = join(HOME, '.claude/settings.json');
+const RUNTIME_PATHS = resolveRuntimePaths();
+const SETTINGS_PATH = join(RUNTIME_PATHS.configRoot, 'settings.json');
 
 // Identity-file paths derive from LifeosConfig's userDir. On fresh installs where
 // LIFEOS_CONFIG.toml hasn't been created yet, fall back to the conventional
@@ -36,7 +35,7 @@ function paiUserDir(): string {
   try {
     return loadLifeosConfig().paths.userDir;
   } catch {
-    return join(HOME, '.claude/LIFEOS/USER');
+    return RUNTIME_PATHS.userDir;
   }
 }
 const DA_IDENTITY_PATH = join(paiUserDir(), 'DIGITAL_ASSISTANT/DA_IDENTITY.md');
