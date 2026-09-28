@@ -12,4 +12,15 @@ describe("Codex harness detection", () => {
     expect(result.skillsDir).toBe(join(root, "skills"));
     expect(result.confidence).toBe("detected");
   });
+
+  test("an explicit Claude config root wins when Codex is merely installed", () => {
+    const home = normalize("C:/Users/Test User");
+    const claudeRoot = join(home, ".claude-custom");
+    const result = detectHarness(home, { CLAUDE_CONFIG_DIR: claudeRoot }, (name) => (
+      name === "codex" ? join(home, ".local", "bin", "codex.exe") : undefined
+    ));
+    expect(result.name).toBe("claude-code");
+    expect(result.configRoot).toBe(claudeRoot);
+    expect(result.confidence).toBe("detected");
+  });
 });

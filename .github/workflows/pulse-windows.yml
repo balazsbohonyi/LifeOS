@@ -34,6 +34,7 @@ jobs:
             LifeOS/install/LIFEOS/TOOLS/RuntimePaths.test.ts `
             LifeOS/install/LIFEOS/PULSE/lib.scheduler.test.ts `
             LifeOS/install/LIFEOS/PULSE/lib/capabilities.test.ts `
+            LifeOS/install/LIFEOS/PULSE/lib/instance-lock.test.ts `
             LifeOS/Tools/InstallEngine.windows.test.ts
 
       - name: Native lifecycle acceptance

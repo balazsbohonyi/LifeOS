@@ -136,8 +136,8 @@ export function detectHarness(
   executableFinder: typeof findExecutable = findExecutable,
 ): HarnessInfo {
   const candidates: Array<{ name: Harness; root: string; skills: string; bin: string }> = [
-    { name: "codex", root: env.CODEX_HOME || join(home, ".codex"), skills: "skills", bin: "codex" },
     { name: "claude-code", root: env.CLAUDE_CONFIG_DIR || join(home, ".claude"), skills: "skills", bin: "claude" },
+    { name: "codex", root: env.CODEX_HOME || join(home, ".codex"), skills: "skills", bin: "codex" },
     { name: "opencode", root: env.OPENCODE_CONFIG_DIR || join(home, ".config", "opencode"), skills: "skills", bin: "opencode" },
     { name: "hermes", root: join(home, ".hermes"), skills: "skills", bin: "hermes" },
     { name: "cursor", root: join(home, ".cursor"), skills: "skills", bin: "cursor" },
@@ -150,10 +150,15 @@ export function detectHarness(
     skillsDir: join(c.root, c.skills),
     confidence,
   });
-  const codex = candidates[0];
-  if (env.CODEX_HOME || env.CODEX_THREAD_ID || env.CODEX_SESSION_ID || env.CODEX_SANDBOX) {
+  const claude = candidates.find((candidate) => candidate.name === "claude-code")!;
+  const codex = candidates.find((candidate) => candidate.name === "codex")!;
+  const opencode = candidates.find((candidate) => candidate.name === "opencode")!;
+  if (env.CODEX_THREAD_ID || env.CODEX_SESSION_ID || env.CODEX_SANDBOX) {
     return info(codex, "detected");
   }
+  if (env.CLAUDE_CONFIG_DIR) return info(claude, "detected");
+  if (env.OPENCODE_CONFIG_DIR) return info(opencode, "detected");
+  if (env.CODEX_HOME) return info(codex, "detected");
   for (const c of candidates) {
     if (existsSync(c.root) && hasBin(c)) return info(c, "detected");
   }

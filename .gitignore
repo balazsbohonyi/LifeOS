@@ -47,6 +47,7 @@ node_modules/
 tmp/
 temp/
 *.tmp
+LifeOS/install/LIFEOS/PULSE/state/pulse.lock.json
 
 # Build outputs
 dist/

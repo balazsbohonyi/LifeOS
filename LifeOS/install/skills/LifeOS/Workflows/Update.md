@@ -30,7 +30,7 @@ curl -s -X POST http://localhost:31337/notify -H "Content-Type: application/json
 4. **Re-merge hooks** — `bun Tools/InstallHooks.ts --apply` (idempotent): adds new hook entries, leaves existing ones, never duplicates (normalized-command dedup). Backs up `settings.json` first.
 5. **Scaffold new USER templates only** — `bun Tools/ScaffoldUser.ts --apply` copyMissing: adds any NEW template files introduced by the version, never overwrites the user's existing files.
 6. **Re-activate imports** — `bun Tools/ActivateImports.ts --apply` for any newly-shipped identity import lines.
-7. **Repair active services** — if Pulse was installed, preserve its prior task/health state, run `<configRoot>/LIFEOS/PULSE/manage.ps1 repair -Json`, and require a matching `runtimeRoot`, non-empty `instanceId`, `taskOwned`, `lockOwned`, and a served dashboard. Registration alone is not success; on failure, show the Pulse log and repair command.
+7. **Repair active services** — if Pulse was installed, preserve its prior service/health state and dispatch by platform. On Windows, run `<configRoot>/LIFEOS/PULSE/manage.ps1 repair -Json` and require matching `runtimeRoot`, non-empty `instanceId`, `taskOwned`, `lockOwned`, and a served dashboard. On macOS/Linux, run `bash <configRoot>/LIFEOS/PULSE/manage.sh install`, then require `/healthz` to report the expected `runtimeRoot`, a non-empty `instanceId`, and a served dashboard. Registration alone is not success; on failure, show the platform's Pulse log and repair command.
 8. **Verify** — hooks fire + imports resolve, and any previously active Pulse instance is healthy with its USER config and scheduler state preserved.
 
 ## Rule

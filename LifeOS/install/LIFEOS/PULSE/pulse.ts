@@ -14,11 +14,12 @@
  */
 
 import { isAbsolute, join } from "path"
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "fs"
+import { existsSync, mkdirSync, readFileSync } from "fs"
 import { loadLifeosConfig } from "../TOOLS/LifeosConfig"
 import { resolveRuntimePaths } from "../TOOLS/RuntimePaths.ts"
 import { isLoopbackHostHeader } from "./lib/host-guard.ts"
 import { buildCapabilities } from "./lib/capabilities.ts"
+import { acquireInstanceLock, type InstanceLockHandle } from "./lib/instance-lock.ts"
 
 // ── Load .env before anything else ──
 
@@ -487,12 +488,11 @@ const STATE_PATH = join(PULSE_DIR, "state", "state.json")
 const PID_PATH = join(PULSE_DIR, "state", "pulse.pid")
 const LOCK_PATH = join(PULSE_DIR, "state", "pulse.lock.json")
 const INSTANCE_ID = crypto.randomUUID()
+let instanceLock: InstanceLockHandle | null = null
 
 function releaseOwnedLock(): void {
-  try {
-    const owned = JSON.parse(readFileSync(LOCK_PATH, "utf8")) as { instanceId?: string }
-    if (owned.instanceId === INSTANCE_ID) unlinkSync(LOCK_PATH)
-  } catch { /* lock was never acquired, already removed, or replaced */ }
+  instanceLock?.release()
+  instanceLock = null
 }
 const MAX_FAILURES = 3
 // A latched job (>= MAX_FAILURES) gets one retry attempt after this cooldown
@@ -673,28 +673,12 @@ async function main() {
   // available in native Windows sessions and could mistake any bun process for
   // Pulse. An exclusive lock identifies the PID, instance, and owning root.
   mkdirSync(join(PULSE_DIR, "state"), { recursive: true })
-  const lock = { pid: process.pid, instanceId: INSTANCE_ID, runtimeRoot: LIFEOS_DIR, startedAt: new Date().toISOString() }
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const fd = openSync(LOCK_PATH, "wx")
-      try { writeFileSync(fd, JSON.stringify(lock, null, 2) + "\n") } finally { closeSync(fd) }
-      break
-    } catch (err: any) {
-      if (err?.code !== "EEXIST") throw err
-      let existing: { pid?: number; instanceId?: string; runtimeRoot?: string } = {}
-      try { existing = JSON.parse(readFileSync(LOCK_PATH, "utf8")) } catch { /* malformed lock is stale */ }
-      let live = false
-      if (existing.pid) {
-        try { process.kill(existing.pid, 0); live = true } catch { live = false }
-      }
-      if (live) {
-        log("error", "Another Pulse instance owns this user session — refusing to start a duplicate", { existing })
-        process.exit(1)
-      }
-      try { unlinkSync(LOCK_PATH) } catch { /* another starter won the race */ }
-      if (attempt === 1) throw new Error(`Unable to acquire Pulse lock: ${LOCK_PATH}`)
-    }
-  }
+  instanceLock = acquireInstanceLock(LOCK_PATH, {
+    pid: process.pid,
+    instanceId: INSTANCE_ID,
+    runtimeRoot: LIFEOS_DIR,
+    startedAt: new Date().toISOString(),
+  })
   await Bun.write(PID_PATH, String(process.pid))
 
   const config = await loadPulseConfig()

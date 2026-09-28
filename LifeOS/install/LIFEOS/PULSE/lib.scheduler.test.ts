@@ -54,6 +54,15 @@ describe("structured scheduler jobs", () => {
     expect(invocation.argv).toEqual([powershell, "-NoProfile", "-NonInteractive", "-Command", "Write-Output ok"]);
   });
 
+  test.each(["darwin", "linux"] as const)("preserves legacy Bash commands on %s", (platform) => {
+    const bash = normalize("/bin/bash");
+    const invocation = resolveScriptInvocation({ ...baseJob, command: "printf legacy-ok" }, normalize("/opt/lifeos/PULSE"), {
+      platform,
+      executableFinder: (name) => name === "bash" ? bash : undefined,
+    });
+    expect(invocation.argv).toEqual([bash, "-c", "printf legacy-ok"]);
+  });
+
   test("expands environment variables inside structured argument arrays", () => {
     const previous = process.env.PULSE_FIXTURE_ROOT;
     process.env.PULSE_FIXTURE_ROOT = "C:/Root With Spaces";
