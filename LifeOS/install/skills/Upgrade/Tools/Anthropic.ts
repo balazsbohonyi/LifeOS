@@ -26,8 +26,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { createHash } from 'crypto';
-import { join } from 'path';
-import { homedir } from 'os';
+import { dirname, join } from 'path';
 
 // Types
 interface Source {
@@ -84,8 +83,7 @@ interface State {
 }
 
 // Config
-const HOME = homedir();
-const SKILL_DIR = join(HOME, '.claude', 'skills', 'Upgrade');
+const SKILL_DIR = dirname(import.meta.dir);
 const STATE_DIR = join(SKILL_DIR, 'State');
 const STATE_FILE = join(STATE_DIR, 'last-check.json');
 const SOURCES_FILE = join(SKILL_DIR, 'sources.json');
@@ -541,7 +539,7 @@ function generateRecommendation(update: Update): string {
   // Commands/Slash Commands
   if (titleLower.includes('command') || titleLower.includes('slash command')) {
     return `**LifeOS Impact:** HIGH - Command system update\n` +
-      `**Why:** LifeOS uses slash commands extensively (~/.claude/Commands/). Changes affect our command architecture and user workflows.\n` +
+      `**Why:** LifeOS uses slash commands extensively. Changes affect the command architecture and user workflows.\n` +
       `**Action:** Review for new command patterns or capabilities. Update LifeOS's command templates if conventions change.`;
   }
 

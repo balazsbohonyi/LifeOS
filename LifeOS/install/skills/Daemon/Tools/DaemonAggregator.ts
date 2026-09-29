@@ -25,6 +25,7 @@ for (const __k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
 import { readFileSync, existsSync, writeFileSync, readdirSync, statSync } from "fs";
 import { join, resolve } from "path";
 import { filterContent, filterDaemonData, loadSecurityOverrides } from "./SecurityFilter.ts";
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts";
 
 // Normalize env path vars that Claude Code injects without shell expansion (LifeOS#1404)
 for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
@@ -36,7 +37,8 @@ for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
 // ─── Path Resolution ───
 
 const HOME = process.env.HOME || process.env.USERPROFILE || "";
-const LIFEOS_DIR = process.env.LIFEOS_DIR || join(HOME, ".claude", "LIFEOS");
+const RUNTIME_PATHS = resolveRuntimePaths({ home: HOME || undefined });
+const LIFEOS_DIR = RUNTIME_PATHS.lifeosDir;
 const USER_DIR = join(LIFEOS_DIR, "USER");
 const MEMORY_DIR = join(LIFEOS_DIR, "MEMORY");
 const TELOS_DIR = join(USER_DIR, "TELOS");

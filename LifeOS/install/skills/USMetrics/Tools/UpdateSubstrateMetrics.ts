@@ -13,7 +13,7 @@
  *   EIA_API_KEY         - Required for gas prices
  *   USMETRICS_DATA_DIR  - Optional. Directory holding the US-Common-Metrics
  *                         dataset. Defaults to
- *                         ~/.claude/LIFEOS/USER/DATA/US-Common-Metrics
+ *                         <active LIFEOS_DIR>/USER/DATA/US-Common-Metrics
  *
  * Output files (inside the data directory):
  *   - US-Common-Metrics.md      (updated values)
@@ -24,6 +24,7 @@
 import { parseArgs } from "util";
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from "fs";
 import { join } from "path";
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts";
 
 // ============================================================================
 // CONFIGURATION
@@ -32,7 +33,7 @@ import { join } from "path";
 // Where the US-Common-Metrics dataset lives. Override with USMETRICS_DATA_DIR;
 // otherwise fall back to the USER tree, which every install has.
 const SUBSTRATE_PATH = process.env.USMETRICS_DATA_DIR
-  || join(process.env.HOME || "", ".claude/LIFEOS/USER/DATA/US-Common-Metrics");
+  || join(resolveRuntimePaths().userDir, "DATA", "US-Common-Metrics");
 const FRED_API_KEY = process.env.FRED_API_KEY;
 const EIA_API_KEY = process.env.EIA_API_KEY;
 
@@ -430,7 +431,7 @@ Environment:
   FRED_API_KEY        Required for most metrics
   EIA_API_KEY         Required for gas prices
   USMETRICS_DATA_DIR  Optional. Dataset directory. Defaults to
-                      ~/.claude/LIFEOS/USER/DATA/US-Common-Metrics
+                      <active LIFEOS_DIR>/USER/DATA/US-Common-Metrics
 
 Output (inside the dataset directory):
     - US-Common-Metrics.md (updated)

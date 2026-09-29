@@ -4,7 +4,7 @@ Deterministic user-configured sources for the digest. Not a CLI — imported by 
 
 ## Config
 
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/LocalIntelligence/sources.json`:
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/LocalIntelligence/sources.json`:
 
 ```json
 {

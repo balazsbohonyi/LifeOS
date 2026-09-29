@@ -131,7 +131,7 @@ import { staticFile } from 'remotion'
 
 For detailed patterns on specific topics, see the flat `Ref-*.md` files:
 ```
-~/.claude/skills/Remotion/Tools/Ref-*.md
+$SKILLS_DIR/Remotion/Tools/Ref-*.md
 ```
 <!-- public issue #1760, @jacobo-ortiz — Tools/Reference/ does not exist -->
 

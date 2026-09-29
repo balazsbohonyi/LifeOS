@@ -15,14 +15,14 @@ Running **Detect** in **DetectAI**...
 
 ## Reference
 
-Read `~/.claude/LIFEOS/DOCUMENTATION/Writing/AIWritingPatterns.md` before auditing. It holds the severity tiers (P0/P1/P2), the full word-replacement tables, the pattern categories, and the context tolerance matrix. Auditing from memory produces a shallower, less consistent report than auditing against the catalog.
+Read `$LIFEOS_DIR/DOCUMENTATION/Writing/AIWritingPatterns.md` before auditing. It holds the severity tiers (P0/P1/P2), the full word-replacement tables, the pattern categories, and the context tolerance matrix. Auditing from memory produces a shallower, less consistent report than auditing against the catalog.
 
 ## Statistical Signal Pass
 
 Run the deterministic signals alongside the pattern audit:
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/StatSignals.ts --file <path>   # or --text / stdin; --json for machine output
+bun $LIFEOS_DIR/TOOLS/StatSignals.ts --file <path>   # or --text / stdin; --json for machine output
 ```
 
 It measures n-gram entropy, type-token ratio, and repetition (the tier the research rates real-but-imperfect) plus burstiness, paragraph uniformity, and function-word ratio (weak alone — the GPTZero-class folklore tier). Every value carries its tier; nothing emits a verdict. These catch the *structural* tells the word list cannot see — a text can clear every pattern below and still show flat rhythm and low entropy. Under ~100 words the tool flags itself unreliable; skip the numbers there. For the model-based zero-shot detectors (DetectGPT, Binoculars) that need reference-LM logprobs, `--explain` states why they're absent — the empirical seat is the Score workflow.

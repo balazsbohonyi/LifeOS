@@ -17,15 +17,15 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
 import { parseArgs } from 'node:util';
 import { stringify as toYaml } from 'yaml';
 import { generate } from './GenerateCases.ts';
+import { resolveRuntimePaths } from '../../../LIFEOS/TOOLS/RuntimePaths.ts';
 
-const ROOT = join(homedir(), '.claude');
-const REFLECTIONS = join(ROOT, 'LIFEOS/MEMORY/LEARNING/REFLECTIONS/algorithm-reflections.jsonl');
-const ASK_FIDELITY = join(ROOT, 'LIFEOS/MEMORY/OBSERVABILITY/ask-fidelity.jsonl');
-const DRAFTS_DIR = join(ROOT, 'LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Evals/Suites/_drafts');
+const RUNTIME_PATHS = resolveRuntimePaths();
+const REFLECTIONS = join(RUNTIME_PATHS.memoryDir, 'LEARNING/REFLECTIONS/algorithm-reflections.jsonl');
+const ASK_FIDELITY = join(RUNTIME_PATHS.memoryDir, 'OBSERVABILITY/ask-fidelity.jsonl');
+const DRAFTS_DIR = join(RUNTIME_PATHS.userDir, 'CUSTOMIZATIONS/SKILLS/Evals/Suites/_drafts');
 const SEEN = join(DRAFTS_DIR, '.proposed-failures.json');
 
 interface Failure { key: string; text: string }

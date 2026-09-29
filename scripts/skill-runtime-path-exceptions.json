@@ -1,0 +1,9 @@
+{
+  "exceptions": [
+    {
+      "file": "LifeOS/install/skills/LifeOS/Workflows/Setup.md",
+      "literal": "~/.claude/LIFEOS/",
+      "reason": "Claude-only: the explicit one-time migration must inspect the legacy Claude MEMORY archive while linking the active runtime."
+    }
+  ]
+}

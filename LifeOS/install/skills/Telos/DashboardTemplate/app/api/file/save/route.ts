@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
 import fs from 'fs'
 import path from 'path'
-import os from 'os'
+import { getDashboardRuntimePaths } from '@/lib/runtime-paths'
 
-const TELOS_DIR = path.join(os.homedir(), '.claude/skills/Telos')
+const TELOS_DIR = path.join(getDashboardRuntimePaths().skillsDir, 'Telos')
 
 export async function POST(request: Request) {
   try {

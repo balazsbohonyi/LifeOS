@@ -257,7 +257,7 @@ export default function AddFilePage() {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Persistent Storage</p>
-                  <p>Files are saved to your TELOS directory (~/.claude/skills/Telos/)</p>
+                  <p>Files are saved to the active Telos workspace.</p>
                 </div>
               </div>
             </div>

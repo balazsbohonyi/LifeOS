@@ -25,7 +25,7 @@
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import { copyMissing, detectDevTree } from "./InstallEngine";
+import { copyMissing, detectDevTree, resolveSetupConfigRoot } from "./InstallEngine";
 
 // Runtime top-level entries this tool does NOT deploy:
 //  - USER           shipped separately as a scaffold (ScaffoldUser) + symlinked (LinkUser)
@@ -328,7 +328,7 @@ function deployNestedDependencies(payloadInstall: string, configRoot: string, ap
 function main(): void {
   const a = process.argv.slice(2);
   const home = process.env.HOME || homedir();
-  const configRoot = arg(a, "--config-root") || process.env.CLAUDE_CONFIG_DIR || join(home, ".claude");
+  const configRoot = arg(a, "--config-root") || resolveSetupConfigRoot(home);
   const skillRoot = arg(a, "--skill-root") || join(import.meta.dir, "..");
   const payloadInstall = join(skillRoot, "install");
   const apply = a.includes("--apply");

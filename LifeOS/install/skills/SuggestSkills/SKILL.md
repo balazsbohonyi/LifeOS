@@ -4,6 +4,11 @@ version: 1.0.0
 description: "Discover WHICH new skills you should create, from your own work history plus your satisfaction/frustration signals. Read-only and proposal-only: it surfaces recurring pain that no existing skill, loop, or workflow covers, then hands you a ranked shortlist to build with CreateSkill. It never creates or edits a skill itself. Frustration is a first-class signal (a topic can look 'covered' while you keep hitting the same wall inside it), so it reads low ratings and recurrence markers, not just session topics. USE WHEN should I create a skill, what skills do I need, suggest skills, skill gap, based on my recent work, am I missing a skill, what should I build. NOT FOR creating/validating/testing/optimizing an individual skill (use CreateSkill) — this only decides WHAT to build, not how."
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 # SuggestSkills — what should I build next?
 
 A read-only analytics pass over your own work. It answers one question: given what you have actually been doing and where you have been frustrated, is there a recurring problem that deserves its own skill and does not have one yet? It proposes; you decide; `CreateSkill` builds. It has no capability to create or edit a skill, by design.
@@ -11,7 +16,7 @@ A read-only analytics pass over your own work. It answers one question: given wh
 ## Customization
 
 **Before executing, check for user customizations at:**
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/SuggestSkills/`
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/SuggestSkills/`
 
 If this directory exists, load and apply any PREFERENCES.md found there (default window, store paths, review location). If not, proceed with defaults.
 

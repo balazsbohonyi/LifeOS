@@ -4,10 +4,15 @@ version: 1.1.31
 description: "Mandatory orchestrator for all LifeOS skill work — creating, editing, adding a workflow or tool, renaming, validating, or canonicalizing any skill. Handrolling skill files is forbidden; owns the full lifecycle: scaffold, validate, canonicalize, test, improve. USE WHEN create skill, new skill, make a skill, build a skill, set up a skill, private skill, make a X skill, add a workflow, add a tool, edit/change/update/rename a skill, skill frontmatter, validate skill, check skill, canonicalize, scaffold skill, test skill, improve skill, optimize description, skill not triggering, overtriggering. NOT FOR TypeScript CLI generation (use CreateCLI)."
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 ## Customization
 
 **Before executing, check for user customizations at:**
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/CreateSkill/`
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/CreateSkill/`
 
 If this directory exists, load and apply any PREFERENCES.md, configurations, or resources found there. These override default behavior. If the directory does not exist, proceed with skill defaults.
 
@@ -37,9 +42,9 @@ Complete skill development lifecycle: **structure** (create, validate, canonical
 
 ## Authoritative Source
 
-**Before creating ANY skill, READ:** `~/.claude/LIFEOS/DOCUMENTATION/Skills/SkillSystem.md`
+**Before creating ANY skill, READ:** `$LIFEOS_DIR/DOCUMENTATION/Skills/SkillSystem.md`
 
-**Canonical example to follow:** any well-formed public skill in `~/.claude/skills/` (e.g. `Research/SKILL.md`, `Daemon/SKILL.md`, `CreateSkill/SKILL.md` itself).
+**Canonical example to follow:** any well-formed public skill in `$SKILLS_DIR/` (e.g. `Research/SKILL.md`, `Daemon/SKILL.md`, `CreateSkill/SKILL.md` itself).
 
 ## Naming Convention — Public vs Private
 
@@ -67,7 +72,7 @@ Complete skill development lifecycle: **structure** (create, validate, canonical
 
 ### Choosing public vs private — the decision rule
 
-Ask: **"Could this skill be dropped, as-is, into a stranger's `~/.claude/skills/` and just work?"**
+Ask: **"Could this skill be dropped, as-is, into a stranger's `$SKILLS_DIR/` and just work?"**
 
 - **Yes** → public skill (`TitleCase`). Body must be generic; user-specific config layers in via `LIFEOS/USER/CUSTOMIZATIONS/SKILLS/<SkillName>/`.
 - **No, because it references my identity, my contacts, my business, my customer, my paid API, my private infra, my domain, my private repo, my partner, or my financial/health/security data** → private skill (`_ALLCAPS`).
@@ -132,13 +137,13 @@ If none of the above apply and the skill is fully generic — it can be `TitleCa
 
 ### Where Personal Layering Goes for Public Skills
 
-A public skill can be made user-specific at runtime via `~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/<SkillName>/PREFERENCES.md`. The skill body stays generic; the user's customization file overlays per-instance context. Use this when a skill is fundamentally generic but benefits from per-user tweaks (preferred voice, default formats, personal taste).
+A public skill can be made user-specific at runtime via `$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/<SkillName>/PREFERENCES.md`. The skill body stays generic; the user's customization file overlays per-instance context. Use this when a skill is fundamentally generic but benefits from per-user tweaks (preferred voice, default formats, personal taste).
 
 **Do not use CUSTOMIZATIONS/SKILLS to smuggle private content into a public skill.** If the skill *requires* private context to function (real customer name, real API account, real internal infra), it is a private skill — name it `_ALLCAPS` and stop.
 
 ### Allowed in Public Skills
 
-- Generic `~/` paths (`~/.claude/skills/`, `~/Projects/<tool>/`) — resolve per-user
+- Generic `~/` paths (`$SKILLS_DIR/`, `~/Projects/<tool>/`) — resolve per-user
 - Public repo URLs for tools the skill depends on
 - Public API endpoints that are conventions, not secrets (e.g., `localhost:31337/notify`)
 - Example values clearly marked as placeholders (`<url>`, `<SESSION_ID>`, `test@example.com`)
@@ -148,7 +153,7 @@ A public skill can be made user-specific at runtime via `~/.claude/LIFEOS/USER/C
 
 Before shipping or modifying ANY skill, run the hygiene gate:
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/SkillHygieneGate.ts --skill <SkillName>
+bun $LIFEOS_DIR/TOOLS/SkillHygieneGate.ts --skill <SkillName>
 ```
 
 It scans against the canonical deny-list (`LIFEOS/USER/SECURITY/DENY_LIST.txt` — the list is identity DATA, so it lives in the USER tree) plus home-path shapes. Exit 0 = clean. Any violation = move the data to `LIFEOS/USER/CUSTOMIZATIONS/SKILLS/<SkillName>/` (or its canonical USER home) and reference it by path. Since 2026-07-23 there is no private-skill exemption — `_ALLCAPS` decides where a skill *ships* (nowhere), not what its files may contain.
@@ -203,7 +208,7 @@ skills/SkillName/Tools/Utils/Helper.ts           # THREE levels - NO
 
 **If you need to organize many workflows, use clear filenames instead of subdirectories:**
 
-**See:** `~/.claude/LIFEOS/DOCUMENTATION/Skills/SkillSystem.md` (Flat Folder Structure section)
+**See:** `$LIFEOS_DIR/DOCUMENTATION/Skills/SkillSystem.md` (Flat Folder Structure section)
 
 ---
 
@@ -316,7 +321,7 @@ Brief description.
 - **Efficiency:** Workflows load only what they actually need
 - **Maintainability:** Easier to update individual sections
 
-**See:** `~/.claude/LIFEOS/DOCUMENTATION/Skills/SkillSystem.md` (Dynamic Loading Pattern section)
+**See:** `$LIFEOS_DIR/DOCUMENTATION/Skills/SkillSystem.md` (Dynamic Loading Pattern section)
 
 ---
 
@@ -508,7 +513,7 @@ User: "The research skill output is too verbose — improve it"
 After completing any workflow, append a single JSONL entry:
 
 ```bash
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"CreateSkill","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> ~/.claude/LIFEOS/MEMORY/SKILLS/execution.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"CreateSkill","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> $LIFEOS_DIR/MEMORY/SKILLS/execution.jsonl
 ```
 
 Replace `WORKFLOW_USED` with the workflow executed, `8_WORD_SUMMARY` with a brief input description, and `SECONDS` with approximate wall-clock time. Log `status: "error"` if the workflow failed.

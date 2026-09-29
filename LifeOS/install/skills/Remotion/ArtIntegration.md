@@ -6,7 +6,7 @@
 
 1. **Load Art preferences:**
    ```
-   ~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Art/PREFERENCES.md
+   $LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Art/PREFERENCES.md
    ```
 
 2. **Apply the LifeOS Theme** derived from Art preferences:
@@ -21,18 +21,19 @@
 
 3. **Use Theme Constants:**
    ```
-   ~/.claude/skills/Remotion/Tools/Theme.ts
+   $SKILLS_DIR/Remotion/Tools/Theme.ts
    ```
+   Copy it into the project with `cp "$SKILLS_DIR/Remotion/Tools/Theme.ts" src/theme.ts`, then use a relative import from scene files.
 
 4. **Reference images** (when visual style reference needed):
    ```
-   ~/.claude/skills/Art/Examples/
+   $SKILLS_DIR/Art/Examples/
    ```
 
 ## LifeOS Theme Quick Reference
 
 ```typescript
-import { LIFEOS_THEME } from '~/.claude/skills/Remotion/Tools/Theme'
+import { LIFEOS_THEME } from '../theme'
 
 // Colors
 LIFEOS_THEME.colors.background    // #0f172a - Deep slate
@@ -60,7 +61,7 @@ LIFEOS_THEME.spacing.element      // 30px between elements
 ## Using the Theme in Components
 
 ```typescript
-import { LIFEOS_THEME, titleScreenStyle, fadeInterpolation } from '~/.claude/skills/Remotion/Tools/Theme'
+import { LIFEOS_THEME, titleScreenStyle, fadeInterpolation } from '../theme'
 
 export const MyScene: React.FC = () => {
   const frame = useCurrentFrame()

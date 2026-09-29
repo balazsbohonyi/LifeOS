@@ -4,6 +4,11 @@ version: 1.0.0
 description: "macOS system performance diagnostics — see how the machine is running and what's slowing it down: CPU/GPU/memory/energy hogs, thermal throttling, memory and swap pressure, disk usage, Spotlight indexing, launchd/startup load, via a deterministic read-only CLI with known-process interpretation (kernel_task, WindowServer, mds_stores). USE WHEN mac slow, system slow, what's slowing down my mac, computer is slow, what's eating CPU, CPU usage, GPU usage, what's using the GPU, memory pressure, RAM usage, swap, runaway process, fans loud, mac running hot, thermal throttling, system health, check my mac, how's my system running, top processes, energy hogs, activity monitor, startup items, launch agents load, system taxed. NOT FOR network/wifi diagnostics, website or deployed-app health monitoring, or security scanning."
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 # Vitals
 
 Read-only macOS performance inspection: a deterministic CLI gathers the numbers, `Interpretation.md` turns them into a diagnosis instead of a data dump.
@@ -11,7 +16,7 @@ Read-only macOS performance inspection: a deterministic CLI gathers the numbers,
 ## Customization
 
 **Before executing, check for user customizations at:**
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Vitals/`
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Vitals/`
 
 If this directory exists, load and apply any PREFERENCES.md, configurations, or resources found there. These override default behavior. If the directory does not exist, proceed with skill defaults.
 
@@ -42,9 +47,9 @@ If this directory exists, load and apply any PREFERENCES.md, configurations, or 
 ## Quick Reference
 
 ```bash
-bun ~/.claude/skills/Vitals/Tools/Vitals.ts check     # fast snapshot (<1s)
-bun ~/.claude/skills/Vitals/Tools/Vitals.ts hogs      # live per-process CPU/energy (~3s)
-bun ~/.claude/skills/Vitals/Tools/Vitals.ts full      # everything (~4s)
+bun $SKILLS_DIR/Vitals/Tools/Vitals.ts check     # fast snapshot (<1s)
+bun $SKILLS_DIR/Vitals/Tools/Vitals.ts hogs      # live per-process CPU/energy (~3s)
+bun $SKILLS_DIR/Vitals/Tools/Vitals.ts full      # everything (~4s)
 # also: gpu · memory · disk · thermal · startup · --json · --top N
 ```
 

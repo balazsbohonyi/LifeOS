@@ -19,7 +19,7 @@ Running the **MineReflections** workflow in the **Upgrade** skill to mine intern
 
 ## Overview
 
-The Algorithm writes a reflection after every run that did real work to `~/.claude/LIFEOS/MEMORY/LEARNING/REFLECTIONS/algorithm-reflections.jsonl` via `LIFEOS/TOOLS/Reflect.ts` (the only sanctioned writer — never append by hand). The improvement signal is the **`reflection` field**: what a smarter run would have done. This workflow mines that channel for **recurring themes** and produces **actionable upgrade candidates** for the Algorithm, skills, hooks, or system architecture.
+The Algorithm writes a reflection after every run that did real work to `$LIFEOS_DIR/MEMORY/LEARNING/REFLECTIONS/algorithm-reflections.jsonl` via `LIFEOS/TOOLS/Reflect.ts` (the only sanctioned writer — never append by hand). The improvement signal is the **`reflection` field**: what a smarter run would have done. This workflow mines that channel for **recurring themes** and produces **actionable upgrade candidates** for the Algorithm, skills, hooks, or system architecture.
 
 ---
 
@@ -61,7 +61,7 @@ Current-era entry (schema 9, authoritative shape in `LIFEOS/TOOLS/Reflect.ts`):
 ### Step 1: Read All Reflections
 
 ```
-Read ~/.claude/LIFEOS/MEMORY/LEARNING/REFLECTIONS/algorithm-reflections.jsonl
+Read $LIFEOS_DIR/MEMORY/LEARNING/REFLECTIONS/algorithm-reflections.jsonl
 
 Parse each line as JSON. Collect all entries into an array.
 Report: "Found N reflections spanning [date range]"
@@ -121,7 +121,7 @@ Sort upgrade candidates by:
 ```
 # Internal Reflection Mining Report
 
-**Source:** ~/.claude/LIFEOS/MEMORY/LEARNING/REFLECTIONS/algorithm-reflections.jsonl
+**Source:** $LIFEOS_DIR/MEMORY/LEARNING/REFLECTIONS/algorithm-reflections.jsonl
 **Entries analyzed:** N
 **Date range:** [earliest] to [latest]
 **High-signal entries:** N (sentiment <= 5 or over-budget or failed criteria)

@@ -16,13 +16,16 @@ for (const __k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
  * Usage:
  *   generate-midjourney-image --prompt "..." --aspect-ratio 16:9 --output /tmp/image.png
  *
- * @see ~/.claude/skills/Art/SKILL.md
+ * @see the installed Art/SKILL.md
  */
 
 import { DiscordBotClient } from '../Lib/discord-bot.js';
 import { MidjourneyClient, MidjourneyError } from '../Lib/midjourney-client.js';
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { join } from 'node:path';
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts";
+
+const RUNTIME_PATHS = resolveRuntimePaths();
 
 // Normalize env path vars that Claude Code injects without shell expansion (LifeOS#1404)
 for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
@@ -36,18 +39,15 @@ for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
 // ============================================================================
 
 /**
- * Load environment variables from ${LIFEOS_DIR}/.env
+ * Load environment variables from the active runtime's .env files.
  * This ensures API keys are available regardless of how the CLI is invoked
  */
 async function loadEnv(): Promise<void> {
-  // The canonical .env lives at ~/.claude/.env — LIFEOS_DIR often points at the
-  // ~/.claude/LIFEOS SUBdirectory, which has no .env, and the silent catch made
-  // present keys invisible (public issue #1515, @xmasyx). Try LIFEOS_DIR first,
-  // then the canonical location; load the first that exists.
-  const home = process.env.HOME!;
+  // Check the active LifeOS directory first, then the harness config root. The
+  // resolver filters stale Claude paths when this process belongs to Codex.
   const candidates = Array.from(new Set([
-    ...(process.env.LIFEOS_DIR ? [resolve(process.env.LIFEOS_DIR, '.env')] : []),
-    resolve(home, '.claude', '.env'),
+    join(RUNTIME_PATHS.lifeosDir, ".env"),
+    RUNTIME_PATHS.envPath,
   ]));
   for (const envPath of candidates) {
     let envContent: string;

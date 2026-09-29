@@ -25,13 +25,13 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { homedir } from "node:os"
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts"
 
 import { readHometown, NoHometownError } from "./Hometown.ts"
 import { loadUserSources, fetchSourceItems, type UserSource } from "./UserSources.ts"
 import type { Digest, FetchResult, Item, SectionKey } from "./Types.ts"
 
-const DATA_DIR = join(homedir(), ".claude", "LIFEOS", "MEMORY", "DATA", "LocalIntelligence")
+const DATA_DIR = join(resolveRuntimePaths().memoryDir, "DATA", "LocalIntelligence")
 const SECTION_KEYS: SectionKey[] = [
   "construction", "crime", "business", "officials",
   "legislation", "elections", "arrests", "news",

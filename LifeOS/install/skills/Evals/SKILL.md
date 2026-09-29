@@ -8,6 +8,8 @@ background: false
 
 # Evals — Assertion-First AI Evaluation
 
+Resolve `$LIFEOS_DIR` and `$SKILLS_DIR` from the active runtime before using a path below. During Codex, prefer `CODEX_HOME` or Codex session markers; a stale Claude config must not redirect the run.
+
 ## What it is
 
 An eval gives an AI an input, then applies **assertions** to its output to measure success (Anthropic's definition). A case is `{id, prompt, assert:[...]}`. Each assertion is either **deterministic** (code, fast/free) or **model-graded** (an LLM judge). Cases run multiple trials; we report **pass^k** (all trials pass — the honest metric for a reliability-critical agent) and **pass@k** (any trial passes). Everything routes through `Inference.ts` — subscription-billed, no API-key path, no external deps.
@@ -109,5 +111,5 @@ The v1 grader-stack (`Graders/`, `TrialRunner.ts`) and the `@langwatch/scenario`
 After completing any workflow, append a single JSONL entry:
 
 ```bash
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Evals","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> ~/.claude/LIFEOS/MEMORY/SKILLS/execution.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Evals","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> "$LIFEOS_DIR/MEMORY/SKILLS/execution.jsonl"
 ```

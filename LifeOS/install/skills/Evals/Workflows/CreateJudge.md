@@ -33,7 +33,7 @@ Ask the user:
 
 ### Step 2: Create Judge Config
 
-Create `~/.claude/skills/Evals/UseCases/<name>/judge-config.yaml`:
+Create `$SKILLS_DIR/Evals/UseCases/<name>/judge-config.yaml`:
 
 ```yaml
 judge:
@@ -65,10 +65,10 @@ output:
 ### Step 3: Render Judge Prompt
 
 ```bash
-bun run ~/.claude/skills/Prompting/Tools/RenderTemplate.ts \
+ bun run "$SKILLS_DIR/Prompting/Tools/RenderTemplate.ts" \
   -t Evals/Judge.hbs \
-  -d ~/.claude/skills/Evals/UseCases/<name>/judge-config.yaml \
-  -o ~/.claude/skills/Evals/UseCases/<name>/judge-prompt.md \
+  -d "$SKILLS_DIR/Evals/UseCases/<name>/judge-config.yaml" \
+  -o "$SKILLS_DIR/Evals/UseCases/<name>/judge-prompt.md" \
   --preview
 ```
 
@@ -99,8 +99,8 @@ criteria:
 Run the suite (which contains the use case + judge) via `EvalRunner.ts` and inspect the output:
 
 ```bash
-bun run ~/.claude/skills/Evals/Tools/EvalRunner.ts -s <suite>
-cat ~/.claude/LIFEOS/MEMORY/STATE/Evals-Results/<use-case>/<run-id>/results.json | jq '.trials[0].graders'
+bun run "$SKILLS_DIR/Evals/Tools/EvalRunner.ts" -s <suite>
+cat "$LIFEOS_DIR/MEMORY/STATE/Evals-Results/<use-case>/<run-id>/results.json" | jq '.trials[0].graders'
 ```
 
 To exercise only a single test case while iterating on the judge, scope the suite config to one task in `UseCases/<name>/test-cases/` and re-run.

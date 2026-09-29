@@ -37,6 +37,7 @@ import { parseArgs } from "util";
 import * as fs from "fs";
 import * as path from "path";
 import { homedir } from "node:os";
+import { resolveRuntimePaths } from "./RuntimePaths";
 
 // Normalize env path vars that Claude Code injects without shell expansion (LifeOS#1404)
 for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
@@ -50,8 +51,9 @@ for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
 // ============================================================================
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir();
-const LIFEOS_DIR = process.env.LIFEOS_DIR || path.join(HOME, ".claude", "LIFEOS");
-const MEMORY_DIR = path.join(LIFEOS_DIR, "MEMORY");
+const RUNTIME_PATHS = resolveRuntimePaths({ home: HOME });
+const LIFEOS_DIR = RUNTIME_PATHS.lifeosDir;
+const MEMORY_DIR = RUNTIME_PATHS.memoryDir;
 const KNOWLEDGE_DIR = path.join(MEMORY_DIR, "KNOWLEDGE");
 const WORK_DIR = path.join(MEMORY_DIR, "WORK");
 const LEARNING_DIR = path.join(MEMORY_DIR, "LEARNING");

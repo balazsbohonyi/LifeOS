@@ -4,6 +4,11 @@ version: 1.1.2
 description: "Owns the Ideal State Artifact — the primitive holding a project or task's articulated ideal state; scaffolds, interviews, grills a half-formed idea into shape via checkpointed discovery, scores completeness, reconciles feature excerpts to master, seeds from a repo, and appends decisions/changelog/verification across a locked seventeen-section order. USE WHEN ISA, ISC, ideal state, ideal state criteria, project specification, hill-climb, articulating done, fog, not yet specified, grill me, discovery interview. NOT FOR creating new skills (use CreateSkill)."
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 ## 🚨 MANDATORY: Voice Notification (REQUIRED BEFORE ANY ACTION)
 
 **You MUST send this notification BEFORE doing anything else when this skill is invoked.**
@@ -233,12 +238,12 @@ The Algorithm invokes this skill at run start to scaffold or read an ISA. The sk
 - Planning: `Skill("ISA", "extract feature <name> as ephemeral file")` → ephemeral excerpt.
 - Learning: `Skill("ISA", "reconcile <ephemeral-path> → <master-path>")` → deterministic merge.
 
-The Algorithm doctrine (`~/.claude/LIFEOS/ALGORITHM/LATEST` → `v{LATEST}.md`) governs invocation cadence. This skill is invocation-agnostic — it works the same whether called by the Algorithm or directly by the user.
+The Algorithm doctrine (`$LIFEOS_DIR/ALGORITHM/LATEST` → `v{LATEST}.md`) governs invocation cadence. This skill is invocation-agnostic — it works the same whether called by the Algorithm or directly by the user.
 
 ---
 
 ## Format spec cross-reference
 
-The full ISA format spec lives at `~/.claude/LIFEOS/DOCUMENTATION/ISA/ISAFormat.md`. This skill implements that spec; if there is ever a contradiction, the format spec wins and this skill is updated to match.
+The full ISA format spec lives at `$LIFEOS_DIR/DOCUMENTATION/ISA/ISAFormat.md`. This skill implements that spec; if there is ever a contradiction, the format spec wins and this skill is updated to match.
 
-The system-architecture doc — five identities, three-guardrail taxonomy, fourteen-section body, six workflows, two homes, subsystem relationships — lives at `~/.claude/LIFEOS/DOCUMENTATION/ISA/ISASystem.md`. Read that for the conceptual frame; read this file (and `ISAFormat.md`) for the operational contract.
+The system-architecture doc — five identities, three-guardrail taxonomy, fourteen-section body, six workflows, two homes, subsystem relationships — lives at `$LIFEOS_DIR/DOCUMENTATION/ISA/ISASystem.md`. Read that for the conceptual frame; read this file (and `ISAFormat.md`) for the operational contract.

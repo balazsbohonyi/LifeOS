@@ -30,15 +30,15 @@ A scenario doc `Scenarios/<asset-slug>.md` in the data dir that a responder coul
 ## Blast radius (asset graph)
 
 ```bash
-bun ~/.claude/LIFEOS/ATLAS/Atlas.ts blast   <key>  # inbound: what relies on X
-bun ~/.claude/LIFEOS/ATLAS/Atlas.ts owns    <key>  # outbound: what X owns / would orphan
-bun ~/.claude/LIFEOS/ATLAS/Atlas.ts exposed <key>  # credentials X would leak, compromise-tier first
+bun $LIFEOS_DIR/ATLAS/Atlas.ts blast   <key>  # inbound: what relies on X
+bun $LIFEOS_DIR/ATLAS/Atlas.ts owns    <key>  # outbound: what X owns / would orphan
+bun $LIFEOS_DIR/ATLAS/Atlas.ts exposed <key>  # credentials X would leak, compromise-tier first
 ```
 
 Plus the data stores X can reach, which is the other half of trust inheritance:
 
 ```bash
-bun ~/.claude/LIFEOS/ATLAS/Atlas.ts sql "SELECT a.kind, a.canonical_key FROM edge e JOIN asset a ON a.id=e.dst WHERE e.kind='DEPENDS_ON' AND e.status='active' AND e.src=(SELECT id FROM asset WHERE canonical_key='<key>')"
+bun $LIFEOS_DIR/ATLAS/Atlas.ts sql "SELECT a.kind, a.canonical_key FROM edge e JOIN asset a ON a.id=e.dst WHERE e.kind='DEPENDS_ON' AND e.status='active' AND e.src=(SELECT id FROM asset WHERE canonical_key='<key>')"
 ```
 
 `exposed` + the DEPENDS_ON query together make step 1's "one hop of trust" deterministic. Run both before scoring impact — a worker with no data of its own routinely inherits a 5 through its bindings.
@@ -64,7 +64,7 @@ Likelihood (1-5) from exposure: public URL, auth boundary strength, patch/creden
 For each real risk the scenario surfaces:
 
 ```bash
-bun ~/.claude/skills/ThreatModel/Tools/RiskRegister.ts add \
+bun $SKILLS_DIR/ThreatModel/Tools/RiskRegister.ts add \
   --title "<short risk>" --threat "<threat>" \
   --assets "<atlas-key>" --data-classes "<classes>" \
   --likelihood <1-5> --impact <1-5> \

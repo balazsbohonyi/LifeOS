@@ -4,10 +4,15 @@ version: 1.1.26
 description: "Improve LifeOS from what the best practitioners are shipping around AI harnesses — Anthropic first (changelogs, docs, releases), then trusted creators, trending repos, and the system's own reflections — extracting concrete techniques and filtering them against verified current state so nothing already-done or rejected is re-recommended. USE WHEN upgrade, system upgrade, check Anthropic, new Claude features, algorithm upgrade, LifeOS upgrade, mine reflections."
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 ## Customization
 
 **Before executing, check for user customizations at:**
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Upgrade/`
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Upgrade/`
 
 If this directory exists, load and apply any PREFERENCES.md, configurations, or resources found there. These override default behavior. If the directory does not exist, proceed with skill defaults.
 
@@ -64,7 +69,7 @@ Signal comes from two directions, and a good run uses both: **external** (what A
 | Surface | Contract |
 |---------|----------|
 | Anthropic (30+ sources: blog, changelogs, GitHub repos, docs) | `bun Tools/Anthropic.ts` — diffs against `State/last-check.json`, updates it itself |
-| YouTube channels | Config: `youtube-channels.json` (base) + user copy in CUSTOMIZATIONS. List: `yt-dlp --flat-playlist --dump-json 'https://www.youtube.com/@HANDLE/videos'`. Transcript: `bun ~/.claude/LIFEOS/TOOLS/GetTranscript.ts '<url>'`. Seen-state: `State/youtube-videos.json` — update after processing |
+| YouTube channels | Config: `youtube-channels.json` (base) + user copy in CUSTOMIZATIONS. List: `yt-dlp --flat-playlist --dump-json 'https://www.youtube.com/@HANDLE/videos'`. Transcript: `bun $LIFEOS_DIR/TOOLS/GetTranscript.ts '<url>'`. Seen-state: `State/youtube-videos.json` — update after processing |
 | GitHub trending | Config: `github_trending` block in user `user-sources.json`. `gh api 'search/repositories?q=QUERY+created:>DATE+stars:>N&sort=...&per_page=3'`. Seen-state: `State/github-trending.json` — merge, never drop entries |
 | Custom sources | `user-sources.json` in CUSTOMIZATIONS — fetch each; skip dead/redirected pages with a note |
 | Claude Code internals | When discoveries touch hooks, settings, slash commands, MCP, agent types, or the SDK/API, spawn `Agent(subagent_type="claude-code-guide")` to verify against the live surface — never answer from memory |
@@ -87,7 +92,7 @@ Signal comes from two directions, and a good run uses both: **external** (what A
 After completing any workflow, append a single JSONL entry:
 
 ```bash
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Upgrade","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> ~/.claude/LIFEOS/MEMORY/SKILLS/execution.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Upgrade","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> $LIFEOS_DIR/MEMORY/SKILLS/execution.jsonl
 ```
 
 Replace `WORKFLOW_USED` with the workflow executed, `8_WORD_SUMMARY` with a brief input description, and `SECONDS` with approximate wall-clock time. Log `status: "error"` if the workflow failed.

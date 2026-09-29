@@ -15,7 +15,7 @@
 import { execFileSync, execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir, release } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { findExecutable, type RuntimePathEnvironment } from "../../../LIFEOS/TOOLS/RuntimePaths.ts";
 
 // ── Types (inlined — the skill ships without the engine's types.ts) ──
@@ -170,6 +170,51 @@ export function detectHarness(
   }
   // Default assumption when nothing is present yet (a clean machine pre-bootstrap).
   return { name: "claude-code", configRoot: join(home, ".claude"), skillsDir: join(home, ".claude", "skills"), confidence: "assumed" };
+}
+
+/**
+ * Resolve the setup target before the shared runtime payload is deployed.
+ * Once available, RuntimePaths.ts owns runtime tools; this bootstrap resolver
+ * follows the same Codex markers and ignores the standard stale Claude root.
+ */
+export function resolveSetupConfigRoot(
+  home = process.env.HOME || process.env.USERPROFILE || homedir(),
+  env: RuntimePathEnvironment = process.env,
+): string {
+  const codexRuntimeKnown = Boolean(env.CODEX_HOME || env.CODEX_THREAD_ID || env.CODEX_SESSION_ID || env.CODEX_SANDBOX);
+  const explicitConfigRoot = codexRuntimeKnown
+    ? env.CODEX_HOME
+    : env.CLAUDE_CONFIG_DIR || env.CODEX_HOME;
+  const lifeosCandidate = env.LIFEOS_DIR;
+  const normalizedHome = resolve(home);
+  const candidateLifeosDir = lifeosCandidate ? resolve(normalizedHome, lifeosCandidate) : undefined;
+  const staleClaudeLifeos = codexRuntimeKnown && candidateLifeosDir !== undefined
+    && (process.platform === "win32"
+      ? candidateLifeosDir.toLowerCase() === resolve(normalizedHome, ".claude", "LIFEOS").toLowerCase()
+      : candidateLifeosDir === resolve(normalizedHome, ".claude", "LIFEOS"));
+
+  if (candidateLifeosDir && !staleClaudeLifeos) {
+    return explicitConfigRoot ? resolve(normalizedHome, explicitConfigRoot) : dirname(candidateLifeosDir);
+  }
+  if (explicitConfigRoot) return resolve(normalizedHome, explicitConfigRoot);
+  return resolve(detectHarness(normalizedHome, env).configRoot || join(normalizedHome, ".claude"));
+}
+
+/** Give child tools the selected install root even when inherited harness
+ * variables describe a stale or different installation. */
+export function setupRuntimeEnvironment(
+  configRoot: string,
+  env: RuntimePathEnvironment = process.env,
+): RuntimePathEnvironment {
+  const childEnv: RuntimePathEnvironment = {
+    ...env,
+    CLAUDE_CONFIG_DIR: configRoot,
+    LIFEOS_DIR: join(configRoot, "LIFEOS"),
+  };
+  if (env.CODEX_HOME || env.CODEX_THREAD_ID || env.CODEX_SESSION_ID || env.CODEX_SANDBOX) {
+    childEnv.CODEX_HOME = configRoot;
+  }
+  return childEnv;
 }
 
 /**

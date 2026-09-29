@@ -24,7 +24,7 @@ import { copyFileSync, existsSync, readFileSync } from "node:fs";
 import { atomicWriteText } from "./lib/atomic-write";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { detectDevTree } from "./InstallEngine";
+import { detectDevTree, resolveSetupConfigRoot } from "./InstallEngine";
 
 interface Args { configRoot: string; skillRoot: string; apply: boolean; allowDev: boolean; }
 
@@ -36,7 +36,7 @@ function parseArgs(): Args {
   };
   const home = process.env.HOME || homedir(); // public issue #1729, @umair-a11y
   return {
-    configRoot: get("--config-root") || process.env.CLAUDE_CONFIG_DIR || join(home, ".claude"),
+    configRoot: get("--config-root") || resolveSetupConfigRoot(home),
     skillRoot: get("--skill-root") || join(import.meta.dir, ".."),
     apply: a.includes("--apply"),
     allowDev: a.includes("--allow-dev"),

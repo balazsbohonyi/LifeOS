@@ -77,9 +77,14 @@ Copies the LifeOS skill and runtime into the harness's config tree. Existing fil
 ```
 bun Tools/ScaffoldUser.ts --apply
 bun Tools/LinkUser.ts --apply
+
+# Preview runtime and legacy memory archives before the private MEMORY link.
+bun Tools/LinkMemory.ts
+# After the principal reviews a conflict-free preview and explicitly approves:
+bun Tools/LinkMemory.ts --apply --confirm-migration
 ```
 
-Both are dry-run without `--apply`, same as the previous step. Creates the personal config tree from templates and links it in. This is empty structure — no personal content yet. That comes in the interview.
+`ScaffoldUser` and `LinkUser` are dry-run without `--apply`, same as the previous step. They create the personal config tree from templates and link it in. `LinkMemory` is separately previewed and requires explicit migration approval; it preserves existing archives and copies only missing files into the private store.
 
 ### 6. Wire the integration — HARNESS-SPECIFIC, WITH PERMISSION
 

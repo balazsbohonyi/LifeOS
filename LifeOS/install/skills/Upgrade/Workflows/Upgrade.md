@@ -45,7 +45,7 @@ See `SKILL.md` § Sources & Tools for the full table (Anthropic.ts, yt-dlp, GetT
 Recommendations are no longer ephemeral. Before delivering the report, write every 🔴/🟠/🟡 recommendation as one record in the Upgrades store:
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/Upgrades.ts add --source upgrade-skill \
+bun $LIFEOS_DIR/TOOLS/Upgrades.ts add --source upgrade-skill \
   --claim "<one-sentence recommendation>" \
   --current "<what the system does today>" \
   --recommendation "<the proposed encoding>" \
@@ -53,7 +53,7 @@ bun ~/.claude/LIFEOS/TOOLS/Upgrades.ts add --source upgrade-skill \
   --confidence <0-1> --evidence "<source URL or report ref>"
 ```
 
-The store dedups by claim hash — re-running a scan never double-writes. Prior-Status grounding gains a source: check `bun ~/.claude/LIFEOS/TOOLS/Upgrades.ts list --json` for already-rejected (🚫) or already-applied (💬) claims alongside the existing `MEMORY/KNOWLEDGE/REJECTED/` check. Records surface in Pulse `/upgrades`; the applied half lands in the Ledger via `CreateUpdate.ts --upgrade-id`.
+The store dedups by claim hash — re-running a scan never double-writes. Prior-Status grounding gains a source: check `bun $LIFEOS_DIR/TOOLS/Upgrades.ts list --json` for already-rejected (🚫) or already-applied (💬) claims alongside the existing `MEMORY/KNOWLEDGE/REJECTED/` check. Records surface in Pulse `/upgrades`; the applied half lands in the Ledger via `CreateUpdate.ts --upgrade-id`.
 
 ## Registry Feedback
 

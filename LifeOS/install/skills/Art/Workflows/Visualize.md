@@ -99,7 +99,7 @@ TRANSPARENT: Use RemoveBg.ts (Art skill) to remove background for overlay use
 **For transparent background** — use the **Art skill's** background-removal tool:
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/RemoveBg.ts /path/to/visualization.png
+bun $LIFEOS_DIR/TOOLS/RemoveBg.ts /path/to/visualization.png
 ```
 
 
@@ -596,7 +596,7 @@ Optional: Sign small in bottom right corner in charcoal (#2D2D2D).
 **Construct command based on intent:**
 
 ```bash
-bun run ~/.claude/skills/Art/Tools/Generate.ts \
+bun run $SKILLS_DIR/Art/Tools/Generate.ts \
   --workflow=Visualize \
   --model [SELECTED_MODEL] \
   --prompt "[YOUR COMPREHENSIVE PROMPT]" \

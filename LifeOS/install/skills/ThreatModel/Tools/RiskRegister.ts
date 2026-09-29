@@ -3,7 +3,7 @@
  * RiskRegister.ts — deterministic risk register CLI for the ThreatModel skill.
  *
  * Code is public; data is private. The register lives OUTSIDE the skill tree:
- *   default  ~/.claude/LIFEOS/USER/SECURITY/THREATMODEL/
+ *   default  <active LIFEOS_DIR>/USER/SECURITY/THREATMODEL/
  *   override THREATMODEL_DATA_DIR
  * A data dir resolving inside any skills/ path is refused (exit 2).
  *
@@ -13,7 +13,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, realpathSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
-import { homedir } from "node:os";
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts";
 
 type Status = "open" | "mitigating" | "accepted" | "closed";
 const STATUSES: Status[] = ["open", "mitigating", "accepted", "closed"];
@@ -62,7 +62,7 @@ export function scoreRisk(likelihood: number, impact: number): { score: number; 
 
 export function resolveDataDir(): string {
   const dir = resolve(
-    process.env.THREATMODEL_DATA_DIR ?? join(homedir(), ".claude", "LIFEOS", "USER", "SECURITY", "THREATMODEL"),
+    process.env.THREATMODEL_DATA_DIR ?? join(resolveRuntimePaths().userDir, "SECURITY", "THREATMODEL"),
   );
   // Structural code/data separation: never allow the register inside a skill tree.
   const probe = existsSync(dir) ? realpathSync(dir) : dir;

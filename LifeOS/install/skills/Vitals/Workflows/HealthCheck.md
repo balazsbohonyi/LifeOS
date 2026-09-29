@@ -20,9 +20,9 @@ A one-screen report the operator can absorb in ten seconds: an overall verdict (
 ## Tool
 
 ```bash
-bun ~/.claude/skills/Vitals/Tools/Vitals.ts check          # human-readable
-bun ~/.claude/skills/Vitals/Tools/Vitals.ts check --json   # structured
-bun ~/.claude/skills/Vitals/Tools/Vitals.ts check --top 15 # longer process lists
+bun $SKILLS_DIR/Vitals/Tools/Vitals.ts check          # human-readable
+bun $SKILLS_DIR/Vitals/Tools/Vitals.ts check --json   # structured
+bun $SKILLS_DIR/Vitals/Tools/Vitals.ts check --top 15 # longer process lists
 ```
 
 Runs in under a second, no sudo. If anything looks off, offer to run the FindCulprit workflow rather than padding this report.

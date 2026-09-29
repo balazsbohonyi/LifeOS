@@ -192,7 +192,10 @@ success "bun ($(command -v bun), v$(bun --version 2>/dev/null))"
 # ─── Step 2: Detect harness (no clobber) ─────────────────────────
 step "2/6  Detecting your harness"
 if [ -z "$LIFEOS_SKILLS_DIR" ]; then
-  if [ -d "$HOME/.claude" ]; then LIFEOS_SKILLS_DIR="$HOME/.claude/skills"
+  if [ -n "${CODEX_HOME:-}" ] || [ -n "${CODEX_THREAD_ID:-}${CODEX_SESSION_ID:-}${CODEX_SANDBOX:-}" ]; then
+    LIFEOS_SKILLS_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
+  elif [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then LIFEOS_SKILLS_DIR="$CLAUDE_CONFIG_DIR/skills"
+  elif [ -d "$HOME/.claude" ]; then LIFEOS_SKILLS_DIR="$HOME/.claude/skills"
   elif [ -d "$HOME/.config/claude" ]; then LIFEOS_SKILLS_DIR="$HOME/.config/claude/skills"
   else LIFEOS_SKILLS_DIR="$HOME/.claude/skills"; fi
 fi

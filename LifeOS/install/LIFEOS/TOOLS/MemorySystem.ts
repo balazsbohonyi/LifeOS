@@ -41,6 +41,7 @@ import {
   appendFileSync,
   closeSync,
   existsSync,
+  fstatSync,
   fsyncSync,
   mkdirSync,
   openSync,
@@ -50,8 +51,9 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, resolve as pathResolve, join as pathJoin } from "node:path";
-import { homedir, hostname } from "node:os";
+import { randomUUID } from "node:crypto";
+import { dirname, join as pathJoin, relative as pathRelative, sep } from "node:path";
+import { hostname } from "node:os";
 
 import { invariant, InvariantViolation } from "./Invariant";
 
@@ -67,6 +69,7 @@ import {
   ALL_PROPOSAL_KINDS,
   TIER_B_AUDIT_PATH,
   PRINCIPAL_MEMORY_PATH,
+  PRINCIPAL_IDENTITY_PATH,
   type TypedItem,
   type MemoryTypeName,
   type Tier,
@@ -81,10 +84,12 @@ import { getRelevantContext, type RelevantResultItem } from "./MemoryRetriever";
 import { mintId, slugFromPath, SCHEMA_VERSION } from "./KnowledgeSchema";
 import { stripPrivateContent } from "./CaptureEnvelope";
 import { assertInsideUserData } from "./lib/ForeignDataCheck";
+import { resolveRuntimePaths } from "./RuntimePaths";
 
 // ── Constants ──
 
-const CLAUDE_ROOT = pathResolve(homedir(), ".claude");
+const RUNTIME_PATHS = resolveRuntimePaths();
+const RUNTIME_ROOT = RUNTIME_PATHS.configRoot;
 
 // ── Result types ──
 
@@ -121,12 +126,14 @@ export interface FindOptions {
 
 function logTierBWrite(filePath: string, bytes: number, type: MemoryTypeName): void {
   try {
+    const boundary = assertInsideUserData(TIER_B_AUDIT_PATH);
+    if (!boundary.ok) return;
     mkdirSync(dirname(TIER_B_AUDIT_PATH), { recursive: true });
     appendFileSync(
       TIER_B_AUDIT_PATH,
       JSON.stringify({
         ts: new Date().toISOString(),
-        file: filePath.replace(CLAUDE_ROOT + "/", ""),
+        file: pathRelative(RUNTIME_ROOT, filePath).split(sep).join("/"),
         bytes_written: bytes,
         type,
       }) + "\n",
@@ -157,7 +164,7 @@ function logTierBWrite(filePath: string, bytes: number, type: MemoryTypeName): v
 //
 // LOCK_STALE_MS matches DerivedSync.ts's constant rather than inventing a third.
 const LOCK_STALE_MS = 5 * 60 * 1000;
-const LOCK_LOG_PATH = pathJoin(CLAUDE_ROOT, "LIFEOS/MEMORY/OBSERVABILITY/memory-locks.jsonl");
+const LOCK_LOG_PATH = pathJoin(RUNTIME_PATHS.memoryDir, "OBSERVABILITY/memory-locks.jsonl");
 
 type LockReason =
   | "holder-process-gone"
@@ -172,6 +179,8 @@ type LockReason =
  */
 function logLockEvent(event: "stale_lock_recovered" | "lock_contended", lockPath: string, reason: LockReason, detail: string): void {
   try {
+    const boundary = assertInsideUserData(LOCK_LOG_PATH);
+    if (!boundary.ok) return;
     mkdirSync(dirname(LOCK_LOG_PATH), { recursive: true });
     appendFileSync(
       LOCK_LOG_PATH,
@@ -180,7 +189,7 @@ function logLockEvent(event: "stale_lock_recovered" | "lock_contended", lockPath
         pid: process.pid,
         event,
         reason,
-        lock: lockPath.replace(CLAUDE_ROOT + "/", ""),
+        lock: pathRelative(RUNTIME_ROOT, lockPath).split(sep).join("/"),
         detail,
       }) + "\n",
       "utf8",
@@ -258,6 +267,8 @@ function breakStaleLock(lockPath: string): number | null {
 export function appendToTierBFile(filePath: string, content: string): { ok: true; bytes: number } | AddError {
   const lockPath = `${filePath}.lock`;
   let fd: number | null = null;
+  let tmpFd: number | null = null;
+  let tmpPath: string | null = null;
   try {
     mkdirSync(dirname(filePath), { recursive: true });
     fd = openSync(lockPath, "wx");
@@ -283,11 +294,12 @@ export function appendToTierBFile(filePath: string, content: string): { ok: true
   // Stamp the holder so the next contender can prove liveness instead of
   // waiting out the TTL. Best-effort: a failed stamp only costs evidence.
   try {
-    writeFileSync(lockPath, JSON.stringify({ pid: process.pid, host: hostname(), ts: new Date().toISOString() }), "utf8");
+    const lockStat = fstatSync(fd);
+    if (!lockStat.isFile() || lockStat.nlink > 1) throw new Error("lock file has an unsafe link count");
+    writeFileSync(fd, JSON.stringify({ pid: process.pid, host: hostname(), ts: new Date().toISOString() }), "utf8");
   } catch { /* the lock still holds; the next contender falls back to age */ }
 
   try {
-    const tmpPath = `${filePath}.tmp`;
     const existing = existsSync(filePath) ? readFileSync(filePath, "utf8") : "";
     const newContent = existing.length > 0 && !existing.endsWith("\n")
       ? existing + "\n" + content
@@ -298,16 +310,24 @@ export function appendToTierBFile(filePath: string, content: string): { ok: true
     invariant(newContent.startsWith(existing), "tier-B append must preserve existing content as a prefix");
     invariant(newContent.endsWith(content), "tier-B append must end with the appended content");
 
-    writeFileSync(tmpPath, newContent, "utf8");
-    const fdSync = openSync(tmpPath, "r+");
-    try { fsyncSync(fdSync); } finally { closeSync(fdSync); }
+    tmpPath = `${filePath}.tmp.${process.pid}.${randomUUID()}`;
+    tmpFd = openSync(tmpPath, "wx");
+    const tmpStat = fstatSync(tmpFd);
+    if (!tmpStat.isFile() || tmpStat.nlink > 1) throw new Error("temporary write file has an unsafe link count");
+    writeFileSync(tmpFd, newContent, "utf8");
+    fsyncSync(tmpFd);
+    closeSync(tmpFd);
+    tmpFd = null;
     renameSync(tmpPath, filePath);
+    tmpPath = null;
 
     return { ok: true, bytes: Buffer.byteLength(content, "utf8") };
   } catch (e: any) {
     if (e instanceof InvariantViolation) throw e; // impossible states die loud, never as typed errors
     return { ok: false, code: "EWRITE_FAILED", message: `Append failed: ${e?.message}`, underlying: e };
   } finally {
+    try { if (tmpFd !== null) closeSync(tmpFd); } catch { /* ignore */ }
+    try { if (tmpPath !== null) unlinkSync(tmpPath); } catch { /* ignore */ }
     try { if (fd !== null) closeSync(fd); } catch { /* ignore */ }
     try { unlinkSync(lockPath); } catch { /* ignore */ }
   }
@@ -360,6 +380,8 @@ function enqueueProposal(item: TypedItem & { type: "proposal" }): { ok: true; id
 
   try {
     mkdirSync(dirname(path), { recursive: true });
+    const boundary = assertInsideUserData(path);
+    if (!boundary.ok) return { ok: false, code: "EWRITE_FAILED", message: `proposal queue write refused at the system/user boundary: ${boundary.reason}` };
     appendFileSync(
       path,
       JSON.stringify({
@@ -488,14 +510,13 @@ function renderRelatedBlock(related: RelatedLink[] | undefined): string {
  * Emit a new note on the kb-v3 Core Envelope (KnowledgeSchema.ts) so autonomic
  * writes stop re-introducing the old pai-memory-v1 dialect the migration cleaned
  * up. `type` carries the canonical archive type directly (idea, or the knowledge
- * item's entity_type = person|company|research), `title` not `name`,
+ * item's entity_type = person|company|research|blog), `title` not `name`,
  * `created`/`updated` not `last_updated`, a deterministic `id`, provenance as
  * `source_*`. Tags/quality default (flagged inferred) since the item shape
  * doesn't carry them, and `status: seedling` marks it for enrichment. NOTE: a
- * research item is born on the envelope but WITHOUT `source_url` (the item has
- * none), so Lint flags it for source backfill — "born conformant" holds for the
- * envelope, not the per-type source requirement (Forge #7). `slug` is the note's
- * filename slug (for the stable id).
+ * Blog items preserve their source URL, author and publication date so they
+ * satisfy the canonical Blog schema and Pulse can display their provenance.
+ * `slug` is the note's filename slug (for the stable id).
  */
 function renderInitialNote(item: TypedItem, slug: string): string {
   const ts = new Date().toISOString();
@@ -505,7 +526,7 @@ function renderInitialNote(item: TypedItem, slug: string): string {
     throw new Error(`renderInitialNote called for non-note type: ${(item as any).type}`);
   }
   const title = isIdea ? (item as any).title : (item as any).name;
-  const canonicalType = isIdea ? "idea" : (item as any).entity_type; // person|company|research
+  const canonicalType = isIdea ? "idea" : (item as any).entity_type;
   const bodyLen = item.content.trim().length;
   const quality = bodyLen < 400 ? 2 : 5;
   // YAML-safe title: strip newlines (they break both the frontmatter and the H1)
@@ -525,7 +546,14 @@ function renderInitialNote(item: TypedItem, slug: string): string {
     `quality_inferred: true`,
   ];
   if (item.confidence != null) lines.push(`confidence: ${item.confidence}`);
-  lines.push(`source_kind: internal`);
+  const isBlog = isKnowledge && (item as any).entity_type === "blog";
+  lines.push(`source_kind: ${isBlog ? "blog" : "internal"}`);
+  if (isBlog) {
+    lines.push(`source_url: ${JSON.stringify((item as any).source_url)}`);
+    if ((item as any).source_name) lines.push(`source_name: ${JSON.stringify((item as any).source_name)}`);
+    lines.push(`source_author: ${JSON.stringify((item as any).source_author)}`);
+    lines.push(`source_date: ${(item as any).source_date}`);
+  }
   if (item.source_session && item.source_session !== "none") lines.push(`source_session: ${item.source_session}`);
   lines.push(
     `created: ${ts}`,
@@ -681,7 +709,7 @@ export function sanitizeTypedItemForPersistence(item: TypedItem): SanitizedItemR
   const schemas: Record<string, readonly string[]> = {
     memory: ["type", "actor", "op", "content", "entries", "provenance", "confidence"],
     idea: ["type", "title", "content", "source_session", "confidence", "related"],
-    knowledge: ["type", "entity_type", "name", "content", "source_session", "confidence", "related"],
+    knowledge: ["type", "entity_type", "name", "content", "source_session", "confidence", "related", "source_url", "source_name", "source_author", "source_date"],
     proposal: ["type", "target_file", "target_kind", "edit", "confidence", "rationale", "observed_across_sessions", "source_session"],
   };
   if (typeof raw.type !== "string" || !isKnownType(raw.type)) return invalid("invalid item type");
@@ -727,6 +755,30 @@ export function sanitizeTypedItemForPersistence(item: TypedItem): SanitizedItemR
     if (/[:#][ \t]|^[\-?:,\[\]{}#&*!|>"%@\x27\x60]/.test(value)) return invalid("source_session contains YAML-ambiguous syntax");
     if (value.trim().length === 0) delete cleaned.source_session;
     else cleaned.source_session = value;
+  }
+
+  for (const field of ["source_url", "source_name", "source_author", "source_date"] as const) {
+    if (raw[field] === undefined) continue;
+    const value = cleanText(raw[field], field, { singleLine: true, max: MAX_METADATA_CHARS });
+    if (isError(value)) return value;
+    if (value.trim().length === 0) delete cleaned[field];
+    else cleaned[field] = value;
+  }
+  if (cleaned.source_url !== undefined) {
+    try {
+      const url = new URL(cleaned.source_url);
+      if (url.protocol !== "http:" && url.protocol !== "https:") return invalid("source_url must use http or https");
+    } catch {
+      return invalid("source_url must be a valid absolute URL");
+    }
+  }
+  if (cleaned.source_date !== undefined) {
+    const date = cleaned.source_date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!date) return invalid("source_date must use YYYY-MM-DD");
+    const calendar = new Date(0);
+    calendar.setUTCHours(0, 0, 0, 0);
+    calendar.setUTCFullYear(Number(date[1]), Number(date[2]) - 1, Number(date[3]));
+    if (calendar.toISOString().slice(0, 10) !== cleaned.source_date) return invalid("source_date must be a real calendar date");
   }
 
   if (raw.entries !== undefined) {
@@ -780,8 +832,11 @@ export function sanitizeTypedItemForPersistence(item: TypedItem): SanitizedItemR
       if (cleaned.title === undefined || cleaned.content === undefined) return invalid("idea requires title and content");
       break;
     case "knowledge":
-      if (!["person", "company", "research"].includes(raw.entity_type)) return invalid("knowledge entity_type is invalid");
+      if (!["person", "company", "research", "blog"].includes(raw.entity_type)) return invalid("knowledge entity_type is invalid");
       if (cleaned.name === undefined || cleaned.content === undefined) return invalid("knowledge requires name and content");
+      if (raw.entity_type === "blog" && (!cleaned.source_url || !cleaned.source_author || !cleaned.source_date)) {
+        return invalid("blog knowledge requires source_url, source_author, and source_date");
+      }
       break;
     case "proposal":
       if (typeof raw.target_file !== "string") return invalid("proposal target_file must be a string");
@@ -958,7 +1013,7 @@ async function smokeTest(): Promise<number> {
   // 3. ISC-155 — idea append creates file with frontmatter
   const ideaTitle = `Smoke Idea ${Date.now()}`;
   const r3 = add({ type: "idea", title: ideaTitle, content: "This is a smoke-test idea." });
-  check("ISC-155: idea write succeeded", r3.ok, r3.ok ? `path=${r3.path.replace(homedir(), "~")}` : (r3 as any).message);
+    check("ISC-155: idea write succeeded", r3.ok, r3.ok ? `path=${r3.path.replace(RUNTIME_PATHS.home, "~")}` : (r3 as any).message);
   if (r3.ok) {
     const exists = existsSync(r3.path);
     check("ISC-155: idea file created on disk", exists);
@@ -986,7 +1041,7 @@ async function smokeTest(): Promise<number> {
     content: "Smoke test person record.",
     related: [{ slug: "anthropic", type: "related" }],
   });
-  check("ISC-155: knowledge(person) write succeeded", r4.ok, r4.ok ? `path=${r4.path.replace(homedir(), "~")}` : (r4 as any).message);
+  check("ISC-155: knowledge(person) write succeeded", r4.ok, r4.ok ? `path=${r4.path.replace(RUNTIME_PATHS.home, "~")}` : (r4 as any).message);
   if (r4.ok) {
     check("ISC-155: knowledge file under KNOWLEDGE/People/", r4.path.includes("/MEMORY/KNOWLEDGE/People/"));
 
@@ -1031,7 +1086,7 @@ async function smokeTest(): Promise<number> {
   // 5. ISC-156 — proposal enqueues
   const r5 = add({
     type: "proposal",
-    target_file: pathJoin(homedir(), ".claude/LIFEOS/USER/PRINCIPAL/PRINCIPAL_IDENTITY.md"),
+    target_file: PRINCIPAL_IDENTITY_PATH,
     edit: "RULE: This is a smoke-test proposal — DO NOT APPLY.",
     confidence: 0.42,
     rationale: "smoke test",

@@ -5,7 +5,7 @@ Scan text for watermark and steganography signatures that are readable **without
 ## Run it
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/WatermarkScan.ts --file <path>
+bun $LIFEOS_DIR/TOOLS/WatermarkScan.ts --file <path>
 # also: --text "..."  |  piped stdin  |  --json for machine output  |  --explain for the full model
 ```
 

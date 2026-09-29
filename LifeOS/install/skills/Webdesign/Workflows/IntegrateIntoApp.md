@@ -131,7 +131,7 @@ bun dev &
 DEV_PID=$!
 sleep 5
 
-bun ~/.claude/skills/Webdesign/Tools/VerifyDesign.ts "http://localhost:$DEV_PORT$INTEGRATION_TARGET" "$OUT/in-context"
+bun $SKILLS_DIR/Webdesign/Tools/VerifyDesign.ts "http://localhost:$DEV_PORT$INTEGRATION_TARGET" "$OUT/in-context"
 
 kill $DEV_PID
 ```

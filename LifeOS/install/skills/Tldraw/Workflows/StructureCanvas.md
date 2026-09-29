@@ -27,7 +27,7 @@ Confirm the file path and that the user wants the SAME file mutated (default) vs
 ## Tool contract
 
 ```bash
-T=~/.claude/skills/Tldraw/Tools/Tldr.ts
+T=$SKILLS_DIR/Tldraw/Tools/Tldr.ts
 bun $T inspect <file.tldr> --json              # full read: shapes, text, positions, edges
 bun $T move <file.tldr> --id <id> --x N --y N  # regroup existing shapes
 bun $T add <file.tldr> --spec <spec.json>      # frames, arrows, summary labels

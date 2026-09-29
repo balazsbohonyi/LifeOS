@@ -29,7 +29,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-USER_PREFS="${HOME}/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Interceptor/preferences.env"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONFIG_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
+LIFEOS_DIR="$CONFIG_ROOT/LIFEOS"
+USER_PREFS="$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Interceptor/preferences.env"
+EXT_PIN_DIR="$SKILL_DIR/Extension"
 
 usage() {
     cat <<EOF
@@ -221,11 +225,48 @@ MIN_STDDEV="${INTERCEPTOR_MIN_STDDEV:-0.017}"
 # Loudly record a skipped guard so "the blank-frame check didn't run" is
 # discoverable, never silent (cross-vendor audit 2026-07-07: the fail-open path
 # reproduced the original bug invisibly on any magick-less host).
+has_multiple_hard_links() {
+    local links
+    if links="$(stat -c '%h' -- "$1" 2>/dev/null)"; then
+        :
+    elif links="$(stat -f '%l' "$1" 2>/dev/null)"; then
+        :
+    else
+        return 0 # unknown link count fails closed for this best-effort log
+    fi
+    [[ "$links" =~ ^[0-9]+$ ]] || return 0
+    [ "$links" -gt 1 ]
+}
+
 guard_skipped() {
     local reason="$1"
     echo "Capture.sh: ⚠️  BLANK-FRAME GUARD SKIPPED ($reason) — this capture is NOT checked for a black/blank frame; do not treat it as pixel-verified without looking. Install ImageMagick (brew install imagemagick) to enable." >&2
-    local log="${HOME}/.claude/LIFEOS/MEMORY/OBSERVABILITY/capture-guard.jsonl"
-    mkdir -p "$(dirname "$log")" 2>/dev/null || true
+    local runtime_memory="${LIFEOS_DIR}/MEMORY"
+    local config_dir="${LIFEOS_CONFIG_DIR:-${HOME}/.config/LIFEOS}"
+    [ "$config_dir" = "${HOME}/.config/LIFEOS" ] || return 0
+    for path in "${HOME}/.config" "$config_dir" "$config_dir/USER"; do
+        [ ! -L "$path" ] || return 0
+        [ -d "$path" ] || return 0
+    done
+    local private_user_dir
+    private_user_dir="$(cd "$config_dir/USER" && pwd -P 2>/dev/null)" || return 0
+    local runtime_memory_real
+    runtime_memory_real="$(cd "$runtime_memory" && pwd -P 2>/dev/null)" || return 0
+    [ "$runtime_memory_real" = "$private_user_dir/MEMORY" ] || return 0
+    local log_dir="${runtime_memory}/OBSERVABILITY"
+    local log="${log_dir}/capture-guard.jsonl"
+    [ ! -L "$log_dir" ] || return 0
+    [ ! -L "$log" ] || return 0
+    if [ -e "$log_dir" ] && [ ! -d "$log_dir" ]; then return 0; fi
+    mkdir -p "$log_dir" 2>/dev/null || return 0
+    local log_dir_real
+    log_dir_real="$(cd "$log_dir" && pwd -P 2>/dev/null)" || return 0
+    [ "$log_dir_real" = "$runtime_memory_real/OBSERVABILITY" ] || return 0
+    [ ! -L "$log" ] || return 0
+    if [ -e "$log" ]; then
+        [ -f "$log" ] || return 0
+        has_multiple_hard_links "$log" && return 0
+    fi
     printf '{"ts":"%s","event":"guard-skipped","reason":"%s","out":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$reason" "$OUT" >> "$log" 2>/dev/null || true
 }
 
@@ -336,7 +377,7 @@ Capture.sh: stale/unloaded extension — screenshot-runner.js failed to load.
 
 REMEDIATION (operator):
   In the test profile: chrome://extensions/ -> Interceptor -> Reload (or
-  Load Unpacked from ~/.claude/skills/Interceptor/Extension/). If you just
+  Load Unpacked from $EXT_PIN_DIR/). If you just
   upgraded the binary, re-pin via the Update workflow first.
 EOF
     exit 10
@@ -364,7 +405,7 @@ if printf '%s' "$err" | grep -qiE 'timeout|timed out|native port disconnected|no
         cat >&2 <<EOF
 Capture.sh: stale/unloaded extension after daemon respawn.
 REMEDIATION: reload the Interceptor extension (Load Unpacked from
-  ~/.claude/skills/Interceptor/Extension/), then retry.
+  $EXT_PIN_DIR/), then retry.
 EOF
         exit 10
     fi

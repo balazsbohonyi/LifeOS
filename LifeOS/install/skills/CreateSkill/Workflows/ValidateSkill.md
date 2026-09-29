@@ -20,7 +20,7 @@ Running the **ValidateSkill** workflow in the **CreateSkill** skill to validate 
 **REQUIRED FIRST:** Read the canonical structure:
 
 ```
-~/.claude/LIFEOS/DOCUMENTATION/Skills/SkillSystem.md
+$LIFEOS_DIR/DOCUMENTATION/Skills/SkillSystem.md
 ```
 
 ---
@@ -28,7 +28,7 @@ Running the **ValidateSkill** workflow in the **CreateSkill** skill to validate 
 ## Step 2: Read the Target Skill
 
 ```bash
-~/.claude/skills/[SkillName]/SKILL.md
+$SKILLS_DIR/[SkillName]/SKILL.md
 ```
 
 ---
@@ -37,7 +37,7 @@ Running the **ValidateSkill** workflow in the **CreateSkill** skill to validate 
 
 ### Skill Directory
 ```bash
-ls ~/.claude/skills/ | grep -i [skillname]
+ls $SKILLS_DIR/ | grep -i [skillname]
 ```
 
 Verify TitleCase:
@@ -46,7 +46,7 @@ Verify TitleCase:
 
 ### Workflow Files
 ```bash
-ls ~/.claude/skills/[SkillName]/Workflows/
+ls $SKILLS_DIR/[SkillName]/Workflows/
 ```
 
 Verify TitleCase:
@@ -55,7 +55,7 @@ Verify TitleCase:
 
 ### Tool Files
 ```bash
-ls ~/.claude/skills/[SkillName]/Tools/
+ls $SKILLS_DIR/[SkillName]/Tools/
 ```
 
 Verify TitleCase:
@@ -148,12 +148,12 @@ Common confusable pairs to check: research-style skills (Research vs investigati
 Every skill — public `TitleCase` AND private `_ALLCAPS` (2026-07-23 separation directive) — must be publish-clean in its body, with sensitive data referenced from `LIFEOS/USER/`. Run the deterministic gate, never a hand-rolled grep (a hardcoded pattern list rots and misses most of the deny-list):
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/SkillHygieneGate.ts --skill <SkillName>
+bun $LIFEOS_DIR/TOOLS/SkillHygieneGate.ts --skill <SkillName>
 ```
 
 The gate reads the canonical `LIFEOS/USER/SECURITY/DENY_LIST.txt` (same source the release pipeline uses) and flags identity strings, home-path literals, and git-tracked vendored deps. It runs inside `/ic` too, and the write-time SystemFileGuard blocks deny-listed tokens from landing in a skill body at edit time.
 
-**Exit 0 = PASS.** Any violation = FAIL: move the offending data to `~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/<SkillName>/` (or its canonical USER home) and reference it by path. Additional checks the gate does not cover:
+**Exit 0 = PASS.** Any violation = FAIL: move the offending data to `$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/<SkillName>/` (or its canonical USER home) and reference it by path. Additional checks the gate does not cover:
 - Hardcoded secrets, API keys, tokens, bearer credentials (zero tolerance) — env-var *names* only, values in `~/.claude/.env`.
 - Bare first-names the deny-list ignores for attribution: grep the skill for the principal's and partner's first names (from the identity files) and genericize any that aren't a public citation or a functional detection pattern.
 
@@ -186,7 +186,7 @@ This step is advisory: an unreachable URL gets a `⏳ skipped (unreachable)` not
 ## Step 6: Check Workflow Files
 
 ```bash
-ls ~/.claude/skills/[SkillName]/Workflows/
+ls $SKILLS_DIR/[SkillName]/Workflows/
 ```
 
 Verify:
@@ -200,7 +200,7 @@ Verify:
 ## Step 7: Check Structure
 
 ```bash
-ls -la ~/.claude/skills/[SkillName]/
+ls -la $SKILLS_DIR/[SkillName]/
 ```
 
 Verify:
@@ -218,7 +218,7 @@ Verify:
 
 Check each tool for flag-based configuration:
 ```bash
-bun ~/.claude/skills/[SkillName]/Tools/[ToolName].ts --help
+bun $SKILLS_DIR/[SkillName]/Tools/[ToolName].ts --help
 ```
 
 Verify the tool exposes behavioral configuration via flags:
@@ -232,7 +232,7 @@ Verify the tool exposes behavioral configuration via flags:
 For workflows that call CLI tools, check for intent-to-flag mapping tables:
 
 ```bash
-grep -l "Intent-to-Flag" ~/.claude/skills/[SkillName]/Workflows/*.md
+grep -l "Intent-to-Flag" $SKILLS_DIR/[SkillName]/Workflows/*.md
 ```
 
 **Required pattern in workflows with CLI tools:**
@@ -245,7 +245,7 @@ grep -l "Intent-to-Flag" ~/.claude/skills/[SkillName]/Workflows/*.md
 | (default) | `--model sonnet` | Balanced |
 ```
 
-**Reference:** `~/.claude/LIFEOS/DOCUMENTATION/Tools/CliFirstArchitecture.md`
+**Reference:** `$LIFEOS_DIR/DOCUMENTATION/Tools/CliFirstArchitecture.md`
 
 ---
 

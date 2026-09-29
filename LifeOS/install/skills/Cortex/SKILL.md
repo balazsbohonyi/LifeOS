@@ -1,7 +1,7 @@
 ---
 name: Cortex
-version: 2.1.2
-description: "Operate Cortex, the LifeOS memory system — the typed Knowledge Archive (People, Companies, Ideas, Research with typed related: links) plus recall of prior work sessions, ISAs, and conversations. Search, add, harvest, develop, ingest, distill, graph-navigate, recall. USE WHEN cortex, knowledge, knowledge base, search knowledge, what do we know about, archive, harvest, knowledge status, develop note, add to knowledge, ingest, contradictions, knowledge graph, retrieve, mine conversations, distill, weekly digest, cortex digest, context search, prior work, recall, remember, previous sessions, context recovery, what did we do, find session, search history, resume, pick up where we left off, cold start, yesterday's work, last week, the one about. NOT FOR published-content semantic search across blog/newsletter/X/LinkedIn, or one-shot URL/YouTube ingestion via the Arbol harvester pipeline."
+version: 2.2.0
+description: "Operate Cortex, the LifeOS memory system — the typed Knowledge Archive (People, Companies, Ideas, Research, Blogs, and Books with honest typed related: links) plus recall of prior work sessions, ISAs, and conversations. Search, add, harvest, develop, ingest, distill, graph-navigate, recall. USE WHEN cortex, knowledge, knowledge base, search knowledge, what do we know about, archive, harvest, knowledge status, develop note, add to knowledge, ingest, contradictions, knowledge graph, retrieve, mine conversations, distill, weekly digest, cortex digest, context search, prior work, recall, remember, previous sessions, context recovery, what did we do, find session, search history, resume, pick up where we left off, cold start, yesterday's work, last week, the one about. NOT FOR published-content semantic search across blog/newsletter/X/LinkedIn, or one-shot URL/YouTube ingestion via the Arbol harvester pipeline."
 argument-hint: [search|add|harvest|develop|ingest|distill|recall|contradictions|graph|retrieve|mine|<query>]
 context: fork
 background: false
@@ -11,19 +11,19 @@ background: false
 
 ## What It Does
 
-Operate Cortex, the LifeOS memory system, from one skill. Two halves: the **Knowledge Archive** — a curated, typed graph of notes across six entity domains (People, Companies, Ideas, Research, Blogs, Books), every note shipping typed `related:` cross-links so the archive is a connected graph, not a pile of files — and **recall** — finding prior work (sessions, ISAs, conversations) by topic or date phrase. Operations cover search, add, harvest, develop, ingest, contradiction-finding, graph traversal, compressed retrieval, conversation mining, the weekly distill pass, and session recall.
+Operate Cortex, the LifeOS memory system, from one skill. Two halves: the **Knowledge Archive** — typed notes across People, Companies, Ideas, Research, Blogs, and Books, with verified `related:` links when the connection is real — and **recall** — finding prior work (sessions, ISAs, conversations) by topic or date phrase. Operations cover search, add, harvest, develop, ingest, contradiction-finding, graph traversal, compressed retrieval, conversation mining, the weekly distill pass, and session recall.
 
 ## The Problem
 
-Notes you save in isolation are notes you never find again. A flat folder of facts has no way to tell you that two notes contradict each other, that a new source updates an old claim, or that an idea connects to a person and a company you wrote up months ago. Knowledge dies when it can't be retrieved or related. This archive forces every note into a typed schema with mandatory cross-links and ripples updates through related notes on ingest, so the connections are built in at write time instead of being reconstructed by hand later.
+Notes you save in isolation are notes you never find again. A flat folder of facts has no way to tell you that two notes contradict each other, that a new source updates an old claim, or that an idea connects to a person and a company you wrote up months ago. This archive uses typed notes and adds verified links when context supports them. A first note is valid without invented neighbors; later notes can connect it as the archive grows.
 
 ## How It Works
 
-Manage the LifeOS Knowledge Archive at `~/.claude/LIFEOS/MEMORY/KNOWLEDGE/`. Each operation routes through a subcommand below; notes follow the archive schema and ship with typed cross-links.
+Use the active runtime's `LIFEOS_DIR`, set `MEMORY_DIR="$LIFEOS_DIR/MEMORY"`, and set `SKILLS_DIR` to the active config root's `skills` directory for shell commands that need filesystem paths. When deriving roots, prefer `CODEX_HOME` during Codex, then `CLAUDE_CONFIG_DIR` during Claude Code; if Codex markers are present without `CODEX_HOME`, use `~/.codex`. Never let a stale Claude config setting redirect Codex work. Tools live at `$LIFEOS_DIR/TOOLS`; the archive lives at `$MEMORY_DIR/KNOWLEDGE`.
 
-**Archive schema:** `~/.claude/LIFEOS/MEMORY/KNOWLEDGE/_schema.md`
+**Archive schema:** `$MEMORY_DIR/KNOWLEDGE/_schema.md`
 
-**Hard rule — never write KNOWLEDGE/ directly.** All writes route through this skill (`add`, `harvest`, `ingest`, `develop`) — never `cp`, `mv`, `Write`, or `Edit` straight into the directory, even during migration or bulk import. The skill enforces typed frontmatter, mandatory cross-links, and domain classification; raw filesystem writes skip those guarantees and corrupt the graph silently (broken links don't fail loudly — they produce phantom entries retrieval misses). Migration tooling MUST call this skill per chunk, never shell out to `cp`. The one sanctioned exception is the Algorithm's LEARN phase, which writes to `KNOWLEDGE/` directly because it holds the best context and applies the same schemas (see Gotchas).
+**Hard rule — never write KNOWLEDGE/ directly.** All writes route through this skill (`add`, `harvest`, `ingest`, `develop`) — never `cp`, `mv`, `Write`, or `Edit` straight into the directory, even during migration or bulk import. The skill enforces typed frontmatter, valid source metadata, and domain classification; raw filesystem writes skip those guarantees and corrupt the archive silently. Related links are optional when there is no genuine link. Migration tooling MUST call this skill per chunk, never shell out to `cp`. The one sanctioned exception is the Algorithm's LEARN phase, which writes to `KNOWLEDGE/` directly because it holds the best context and applies the same schemas (see Gotchas).
 
 ## Workflow Routing
 
@@ -57,7 +57,7 @@ If `$ARGUMENTS` doesn't match a subcommand, treat it as a search query.
 Run the harvester status command and display results:
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/KnowledgeHarvester.ts status
+bun "$LIFEOS_DIR/TOOLS/KnowledgeHarvester.ts" status
 ```
 
 Also show:
@@ -76,17 +76,17 @@ Search the Knowledge Archive for notes matching `$ARGUMENTS`.
 
 **Step 1 — Lexical search:**
 ```bash
-rg -i "$ARGUMENTS" ~/.claude/LIFEOS/MEMORY/KNOWLEDGE/ --type md -l
+rg -i "$ARGUMENTS" "$LIFEOS_DIR/MEMORY/KNOWLEDGE/" --type md -l
 ```
 
 **Step 2 — Frontmatter search (tags and titles):**
 ```bash
-rg -i "title:.*$ARGUMENTS|tags:.*$ARGUMENTS" ~/.claude/LIFEOS/MEMORY/KNOWLEDGE/ --type md -l
+rg -i "title:.*$ARGUMENTS|tags:.*$ARGUMENTS" "$LIFEOS_DIR/MEMORY/KNOWLEDGE/" --type md -l
 ```
 
 **Step 3 — Wikilink search:**
 ```bash
-rg "\[\[.*$ARGUMENTS.*\]\]" ~/.claude/LIFEOS/MEMORY/KNOWLEDGE/ --type md -l
+rg "\[\[.*$ARGUMENTS.*\]\]" "$LIFEOS_DIR/MEMORY/KNOWLEDGE/" --type md -l
 ```
 
 Deduplicate results across all three. For each match, read the first 5 lines of frontmatter to show title, domain, status, tags.
@@ -104,28 +104,28 @@ If no results found, say so and suggest checking the full MEMORY/ system or runn
 
 Create a new note manually in the specified entity type.
 
-1. Validate type is one of: People, Companies, Ideas, Research
+1. Validate type is one of: People, Companies, Ideas, Research, Blogs
 2. Ask for a title (or use remaining args after type)
 3. Generate kebab-case filename from title
-4. **MANDATORY: Find 2-3 related notes first.** Before writing the new note, grep existing Knowledge for related entities by topic/tags/name. This becomes the `related:` frontmatter array. No Knowledge note ships without typed links. See Canonical Linking Requirement below.
+4. Search for related notes by topic, tags, and name. Add only links that describe a real relationship. An empty `related: []` is valid when this is the first note or no relevant note exists.
 5. Create the note with proper frontmatter from `_schema.md` — the validator (`LIFEOS/TOOLS/KnowledgeSchema.ts` ENVELOPE) requires all EIGHT of: `id` (mint via `mintId(slug, created)` — `kb_` + 12 hex chars), `type`, `title`, `tags` (min 1), `quality` (0-10), `created`, `updated`, `convention: kb-v3` — plus type-specific body sections. A note built from the old six-field list can never validate (public issue #1678, @christauff). Set `created:` and `updated:` to today's date from `date +%Y-%m-%d` — archive-entry dates, never a source's publication date (public PR #1604, @asdf8675309).
 6. Write the file to `KNOWLEDGE/<Type>/<kebab-case-title>.md` — slug max 60 chars
 7. Verify every slug in `related:` exists in the archive before saving
 8. Regenerate the type's MOC:
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/KnowledgeHarvester.ts index
+bun "$LIFEOS_DIR/TOOLS/KnowledgeHarvester.ts" index
 ```
 
 **Topic is a tag, not a type.** A security insight is an Idea with a `security` tag. A security company is a Company with a `security` tag. The entity type determines the schema; the tag determines the topic.
 
-## Canonical Linking Requirement (MANDATORY)
+## Canonical Linking Guidance
 
-**Every new Knowledge note must ship with typed cross-links.** This is not optional. The normative contract is `_schema.md` (regenerated by the schema tools): every note carries typed `related:` links naming the target note and the relationship type, so the archive is a graph, not a pile.
+**Typed cross-links must be accurate.** Search for existing notes before adding a link, and use the relationship type that fits. The writer accepts `related: []`; never make up a slug or connection to satisfy a count.
 
-**Every write must include:**
+**When the archive has relevant notes, include:**
 
-1. **`related:` frontmatter array** — 2-4 typed entries linking to other Knowledge entries (any domain: People, Companies, Ideas, Research)
-2. **Body wikilinks** — 1-3 `[[slug]]` references woven into the prose where natural (Implications, Evidence, or Context sections)
+1. **`related:` frontmatter array** — zero or more typed entries linking to existing Knowledge entries
+2. **Body wikilinks** — `[[slug]]` references when they improve navigation; do not force them
 
 **9 relationship types** (pick the most accurate, prefer specific over generic):
 
@@ -153,20 +153,20 @@ related:
 **How to find related notes before writing:**
 ```bash
 # By topic/keyword
-rg -l "TOPIC" ~/.claude/LIFEOS/MEMORY/KNOWLEDGE/ --type md
+rg -l "TOPIC" "$LIFEOS_DIR/MEMORY/KNOWLEDGE/" --type md
 
 # By tag overlap
-rg "^tags:.*TAG" ~/.claude/LIFEOS/MEMORY/KNOWLEDGE/ --type md -l
+rg "^tags:.*TAG" "$LIFEOS_DIR/MEMORY/KNOWLEDGE/" --type md -l
 
 # For People/Companies — grep by name
-rg -l "Person Name" ~/.claude/LIFEOS/MEMORY/KNOWLEDGE/
+rg -l "Person Name" "$LIFEOS_DIR/MEMORY/KNOWLEDGE/"
 ```
 
 **Enforcement:**
-- Writes that skip `related:` are incomplete and must be fixed before the skill/workflow returns success
-- The `ingest` workflow runs this as part of the ripple pass
+- Empty `related: []` is valid; never fabricate a related note
+- The `ingest` workflow checks for genuine related notes and plans optional ripple updates
 - The Algorithm LEARN phase includes this in its knowledge capture step
-- All agents writing Knowledge entries must follow this rule — it is part of the schema, not an optional enhancement
+- All agents writing Knowledge entries must preserve valid typed links and leave unrelated notes untouched
 
 ---
 
@@ -175,7 +175,7 @@ rg -l "Person Name" ~/.claude/LIFEOS/MEMORY/KNOWLEDGE/
 Run the KnowledgeHarvester to pull new knowledge from all LifeOS sources:
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/KnowledgeHarvester.ts harvest
+bun "$LIFEOS_DIR/TOOLS/KnowledgeHarvester.ts" harvest
 ```
 
 Display results. If nothing was harvested, explain that sources are already up to date.
@@ -190,7 +190,7 @@ The weekly gardening workflow. Surface seedling notes that are ready for enrichm
 
 **Step 1 — Find seedlings:**
 ```bash
-rg "^status: seedling" ~/.claude/LIFEOS/MEMORY/KNOWLEDGE/ --type md -l
+rg "^status: seedling" "$LIFEOS_DIR/MEMORY/KNOWLEDGE/" --type md -l
 ```
 
 **Step 2 — For each seedling:**
@@ -226,14 +226,16 @@ Summarize the source in 2-3 sentences. Identify key entities, claims, and insigh
 
 ### Step 2 — Classify and create primary note
 
-Determine entity type (People, Companies, Ideas, or Research) using the classification rules in `_schema.md`. Most ingested sources become Ideas.
+Determine entity type (People, Companies, Ideas, Research, or Blogs) using the classification rules in `_schema.md`. An article or newsletter post is a Blog; do not classify it as Research just because it makes claims.
 
-Create the primary note using the schema for that type:
-- Generate kebab-case slug from title (max 60 chars)
-- Write to `KNOWLEDGE/<Type>/<slug>.md` with proper frontmatter
-- Set `created:` and `updated:` to today's date from `date +%Y-%m-%d` — both record when the note entered the archive, **not** when the source was published. A stated publication date belongs in `source_date:`; never let it reach `created:`, and never guess a date the source does not state (public PR #1604, @asdf8675309)
-- Include `source_url:` or `source_path:` in frontmatter
-- **MANDATORY: Include `related:` array with 2-4 typed links** — the ripple pass (Step 3) identifies these, and they must be baked into the frontmatter of the primary note at creation time, not added after
+Create the primary note through the typed Cortex writer, not a direct filesystem write. For a Blog, pass `entity_type: "blog"`, the article URL, author, and stated publication date as `source_url`, `source_author`, and `source_date`. The writer routes it to `MEMORY/KNOWLEDGE/Blogs/`, writes canonical frontmatter, and preserves `related: []` when no real connection exists. Archive `created:` and `updated:` are set by the writer; `source_date:` remains the article's publication date.
+
+Example payload shape for an article:
+```json
+{"type":"knowledge","entity_type":"blog","name":"Article title","content":"A concise original summary of the article.","source_url":"https://example.com/article","source_author":"Author Name","source_date":"2026-01-15","related":[]}
+```
+
+Submit it with `bun "$LIFEOS_DIR/TOOLS/Cortex.ts" remember --adapter <active-adapter> --allow-write '<json-payload>'`. The adapter must match the active harness (`codex` or `claude`).
 
 ### Step 3 — Ripple pass (the key innovation)
 
@@ -241,10 +243,10 @@ Search for existing notes that relate to this new content:
 
 ```bash
 # Search by extracted tags
-rg -i "TAG1|TAG2|TAG3" ~/.claude/LIFEOS/MEMORY/KNOWLEDGE/ --type md -l --glob '!_*'
+rg -i "TAG1|TAG2|TAG3" "$LIFEOS_DIR/MEMORY/KNOWLEDGE/" --type md -l --glob '!_*'
 
 # Search by key entities/concepts mentioned
-rg -i "ENTITY1|ENTITY2" ~/.claude/LIFEOS/MEMORY/KNOWLEDGE/ --type md -l --glob '!_*'
+rg -i "ENTITY1|ENTITY2" "$LIFEOS_DIR/MEMORY/KNOWLEDGE/" --type md -l --glob '!_*'
 ```
 
 For each related note found (up to 10):
@@ -256,10 +258,7 @@ For each related note found (up to 10):
 ```
 📥 INGEST RIPPLE PLAN:
   PRIMARY: Ideas/new-note-slug — "Title" (created)
-  PRIMARY related: frontmatter links (MANDATORY):
-    → Ideas/existing-note-1 — type: extends
-    → Ideas/existing-note-2 — type: supports
-    → People/person-slug — type: related
+  PRIMARY related: verified frontmatter links (or related: [] if none exist)
   RIPPLE (reverse-direction updates to existing notes):
     → Ideas/existing-note-1 — add body [[new-note-slug]] wikilink + add to its related: array (type: extends)
     → Ideas/existing-note-2 — update Evidence section with new data point + add to related:
@@ -270,26 +269,27 @@ For each related note found (up to 10):
 ### Step 4 — Execute ripple updates
 
 After the user approves (or you determine updates are low-risk cross-references):
-- **Primary note**: ensure `related:` frontmatter array has 2-4 typed entries — this is mandatory, not optional
-- **Related notes**: add reverse-direction `related:` entries to their frontmatter with appropriate types
-- **Body wikilinks**: add `[[wikilinks]]` in existing prose where natural (not forced)
+- **Primary note**: keep only verified links; `related: []` is valid
+- **Related notes**: propose reverse-direction updates only when they add useful context, and preserve each note's existing schema
+- **Body wikilinks**: add `[[wikilinks]]` in existing prose where natural
 - Update `updated:` to today's date from `date +%Y-%m-%d` on modified notes; leave their `created:` untouched
-- For contradictions: add a `> ⚠️ **Contradiction:** [note] claims X — see [[new-note]] for counter-evidence` callout, AND add `type: contradicts` in related: arrays
+- For contradictions: propose a `> ⚠️ **Contradiction:** [note] claims X — see [[new-note]] for counter-evidence` callout and a typed `contradicts` link when both claims are genuinely about the same point
 
 ### Step 5 — Log and index
 
-Append to `KNOWLEDGE/_log.md`:
-```
-## [YYYY-MM-DD] ingest | Title
-- Source: <url or path>
-- Primary: <Type>/<slug>
-- Ripple: N notes updated, N contradictions flagged
+Regenerate the archive index:
+```bash
+bun "$LIFEOS_DIR/TOOLS/KnowledgeHarvester.ts" index
 ```
 
-Regenerate MOCs:
+### Step 6 — Verify the saved note and Pulse visibility
+
+Read the writer response and require `ok: true` plus an existing file at the returned `result.path`. Then query the active Pulse Cortex endpoint:
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/KnowledgeHarvester.ts index
+curl -fsS "http://localhost:31337/api/wiki/reindex"
+curl -fsS "http://localhost:31337/api/wiki/knowledge/blogs/<slug>"
 ```
+For a Blog, verify the response has the expected title, `category: "blog"`, source URL, author, and publication date. If the endpoint is unavailable or the note is not returned after reindexing, report that storage succeeded but Cortex visibility is unverified; do not report the ingest as complete.
 
 Present in NATIVE mode.
 
@@ -303,7 +303,7 @@ Find and review conflicting claims across Knowledge notes.
 
 Run the KnowledgeHarvester contradiction finder:
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/KnowledgeHarvester.ts contradictions
+bun "$LIFEOS_DIR/TOOLS/KnowledgeHarvester.ts" contradictions
 ```
 
 This outputs pairs of notes with high tag overlap (2+ shared tags), ranked by overlap count.
@@ -356,21 +356,21 @@ Navigate the Knowledge Archive as a graph.
 
 **No argument — stats overview:**
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/KnowledgeGraph.ts stats
+bun "$LIFEOS_DIR/TOOLS/KnowledgeGraph.ts" stats
 ```
 
 Show node count, edge count, top clusters, most connected hubs, and isolated nodes.
 
 **With slug — traverse from a note:**
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/KnowledgeGraph.ts traverse <slug> --hops 2
+bun "$LIFEOS_DIR/TOOLS/KnowledgeGraph.ts" traverse <slug> --hops 2
 ```
 
 Show all notes connected within 2 hops via tags, wikilinks, and typed relationships. Useful for exploring how knowledge connects across domains.
 
 **Related notes only:**
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/KnowledgeGraph.ts related <slug>
+bun "$LIFEOS_DIR/TOOLS/KnowledgeGraph.ts" related <slug>
 ```
 
 Present in NATIVE mode.
@@ -382,14 +382,14 @@ Present in NATIVE mode.
 Compressed context retrieval over the Knowledge Archive using BM25-lite scoring.
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/MemoryRetriever.ts "<query>" --top 5
+bun "$LIFEOS_DIR/TOOLS/MemoryRetriever.ts" "<query>" --top 5
 ```
 
 Returns the top matching notes with compressed summaries, ranked by title match, tag overlap, and content frequency. Useful for loading relevant knowledge context without reading full files.
 
 For raw excerpts without LLM compression:
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/MemoryRetriever.ts "<query>" --raw
+bun "$LIFEOS_DIR/TOOLS/MemoryRetriever.ts" "<query>" --raw
 ```
 
 Present in NATIVE mode.
@@ -401,14 +401,14 @@ Present in NATIVE mode.
 Mine recent conversations for memory candidates (decisions, preferences, milestones, problems).
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/SessionHarvester.ts --mine --recent 10
+bun "$LIFEOS_DIR/TOOLS/SessionHarvester.ts" --mine --recent 10
 ```
 
 Candidates are written to `KNOWLEDGE/_harvest-queue/` for review — never directly to KNOWLEDGE/. Use `/knowledge harvest` to process the queue.
 
 For dry run (preview only):
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/SessionHarvester.ts --mine --recent 10 --dry-run
+bun "$LIFEOS_DIR/TOOLS/SessionHarvester.ts" --mine --recent 10 --dry-run
 ```
 
 Present in NATIVE mode.
@@ -419,12 +419,12 @@ Present in NATIVE mode.
 
 Weekly harvest of the archive into routed outputs. **Distill is a router, not a destination**: every item lands in the system of record that already owns it, and the digest is an index pointing at those destinations. It never creates or edits KNOWLEDGE notes (mutations belong to `develop`/`contradictions`/`ingest`), and it never re-surfaces an item a previous run already routed.
 
-**Done looks like:** a dated digest at `~/.claude/LIFEOS/MEMORY/DIGESTS/YYYY-MM-DD-distill.md` with ≤10 items across three lanes, every item citing its source notes and linking its routed destination; ≤5 content-idea issues filed; ≤5 upgrades filed; all surfaced items marked in state. Overflow is named with a dropped-count, never silently truncated.
+**Done looks like:** a dated digest at `$LIFEOS_DIR/MEMORY/DIGESTS/YYYY-MM-DD-distill.md` with ≤10 items across three lanes, every item citing its source notes and linking its routed destination; ≤5 content-idea issues filed; ≤5 upgrades filed; all surfaced items marked in state. Overflow is named with a dropped-count, never silently truncated.
 
 ### Step 1 — Gather (deterministic)
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/KnowledgeDistill.ts gather --days 7
+bun "$LIFEOS_DIR/TOOLS/KnowledgeDistill.ts" gather --days 7
 ```
 
 Returns JSON: in-window notes (created/updated, minus previously surfaced), hot tag clusters (window count vs archive baseline), seedling and contradiction stats.
@@ -448,7 +448,7 @@ No config file → skip the issue lane and list content candidates in the digest
 
 System lane (≤5; dedupe is claim-hash based, duplicates exit 0 silently):
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/Upgrades.ts add --claim "<one sentence>" --source autonomous \
+bun "$LIFEOS_DIR/TOOLS/Upgrades.ts" add --claim "<one sentence>" --source autonomous \
   --recommendation "<proposed encoding>" --target <hook|doctrine|rule|skill|settings|context> \
   --evidence "<source note path>"
 ```
@@ -458,14 +458,14 @@ bun ~/.claude/LIFEOS/TOOLS/Upgrades.ts add --claim "<one sentence>" --source aut
 Write the digest file (lanes as sections; every item: pitch, sources, destination link or "empty — <reason>"), then:
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/KnowledgeDistill.ts mark --digest <digest-path>
+bun "$LIFEOS_DIR/TOOLS/KnowledgeDistill.ts" mark --digest <digest-path>
 ```
 
 which records surfaced slugs and item hashes in `MEMORY/STATE/distill.json`.
 
 ### Headless / scheduled
 
-`bun ~/.claude/LIFEOS/TOOLS/KnowledgeDistill.ts run --headless [--dry-run]` performs all four steps unattended (synthesis via `Inference.ts`, never a nested `claude` session). The weekly launchd job `com.lifeos.distill` (Sun 09:00) runs exactly this. `--dry-run` prints the full routing plan and writes nothing.
+`bun "$LIFEOS_DIR/TOOLS/KnowledgeDistill.ts" run --headless [--dry-run]` performs all four steps unattended (synthesis via `Inference.ts`, never a nested harness session). The weekly scheduler runs exactly this. `--dry-run` prints the full routing plan and writes nothing.
 
 Present in NATIVE mode.
 
@@ -476,7 +476,7 @@ Present in NATIVE mode.
 Find prior LifeOS work — sessions, ISAs, conversations — by topic, partial words, or date phrases like "yesterday" or "last week". A deterministic Bun CLI searches five sources in parallel (work registry, session names, work dir names, ISA bodies, conversation jsonl), scores by token-overlap × recency, applies date filters, and returns ranked results with snippets.
 
 ```bash
-bun run ~/.claude/skills/Cortex/Tools/ContextSearch.ts "$ARGUMENTS" --pretty --limit 10
+bun run "$SKILLS_DIR/Cortex/Tools/ContextSearch.ts" "$ARGUMENTS" --pretty --limit 10
 ```
 
 Flag patterns: `--limit N` · `--since YYYY-MM-DD` · `--json | jq '.results[0]'`. Date phrases parse inline: `"yesterday markdown"` becomes a single-day since/until window plus token search for `markdown`.
@@ -520,7 +520,7 @@ User: "what do we know about prompt injection?"
 **Example 2: Ingest a source**
 ```
 User: "/knowledge ingest https://example.com/article"
-→ Fetches the source, classifies entity type, creates primary note with typed related: links
+→ Fetches the source, classifies entity type, creates a primary note with verified related: links (or an empty list)
 → Ripple pass proposes updates to existing related notes; user approves; MOCs regenerated
 ```
 

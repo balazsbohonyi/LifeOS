@@ -26,8 +26,8 @@ Data classes (extend per `PREFERENCES.md`): `credentials` · `pii` · `financial
 Prefer the asset graph if present:
 
 ```bash
-bun ~/.claude/LIFEOS/ATLAS/Atlas.ts sql "SELECT kind, key, attrs FROM asset WHERE kind IN ('worker','domain','d1','r2','kv','repo','project')"
-bun ~/.claude/LIFEOS/ATLAS/Atlas.ts sql "SELECT key FROM asset WHERE kind IN ('d1','r2','kv')"   # data stores first
+bun $LIFEOS_DIR/ATLAS/Atlas.ts sql "SELECT kind, key, attrs FROM asset WHERE kind IN ('worker','domain','d1','r2','kv','repo','project')"
+bun $LIFEOS_DIR/ATLAS/Atlas.ts sql "SELECT key FROM asset WHERE kind IN ('d1','r2','kv')"   # data stores first
 ```
 
 Without a graph: enumerate from what the user names plus repo/config inspection, and state in the output that coverage is user-enumerated, not graph-complete.
@@ -37,7 +37,7 @@ Without a graph: enumerate from what the user names plus repo/config inspection,
 - **No secret values** in the output — reference credential stores by name/key only.
 - **Unclassified is a category, not a gap.** An asset you can't classify from evidence is `unclassified`, surfaced for follow-up.
 - Data stores (databases, buckets, KV) and anything holding credentials are classified FIRST — they anchor impact scoring.
-- Write only to the data dir (`THREATMODEL_DATA_DIR`, default `~/.claude/LIFEOS/USER/SECURITY/THREATMODEL/`). Never into the skill tree.
+- Write only to the data dir (`THREATMODEL_DATA_DIR`, default `$LIFEOS_DIR/USER/SECURITY/THREATMODEL/`). Never into the skill tree.
 
 ## Close
 

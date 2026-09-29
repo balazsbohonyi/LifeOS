@@ -26,7 +26,7 @@ Before drawing, confirm you know: what the diagram must communicate, roughly how
 ## Tool contract
 
 ```bash
-T=~/.claude/skills/Tldraw/Tools/Tldr.ts
+T=$SKILLS_DIR/Tldraw/Tools/Tldr.ts
 bun $T create <file.tldr> [--title "Heading"]
 bun $T add <file.tldr> --spec <spec.json>     # spec: JSON array, kinds: box, ellipse, text, note, frame, arrow
 bun $T validate <file.tldr>

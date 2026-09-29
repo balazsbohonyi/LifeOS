@@ -39,6 +39,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileS
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { detectDevTree } from "./InstallEngine";
+import { resolveRuntimePaths } from "../install/LIFEOS/TOOLS/RuntimePaths.ts";
 
 /** Directories excluded by default from recursive overlays. */
 const SKIP_DIRS = new Set(["node_modules", ".git", "MEMORY", "USER", "out", ".next"]);
@@ -213,7 +214,7 @@ function main(): void {
   const a = process.argv.slice(2);
   const apply = a.includes("--apply");
   const allowDev = a.includes("--allow-dev");
-  const configRoot = arg(a, "--config-root") || process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
+  const configRoot = arg(a, "--config-root") || resolveRuntimePaths().configRoot;
   const skillRoot = arg(a, "--skill-root") || join(configRoot, "skills", "LifeOS");
   const payloadInstall = join(skillRoot, "install");
 

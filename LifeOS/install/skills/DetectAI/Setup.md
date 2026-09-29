@@ -42,7 +42,7 @@ Never put the key in a URL, a committed file, a skill body, or a command that la
 Score a few hundred words you wrote yourself. Anything shorter is not a meaningful test of the setup *or* of the text.
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/PangramScore.ts --file ~/some-writing-of-yours.md
+bun $LIFEOS_DIR/TOOLS/PangramScore.ts --file ~/some-writing-of-yours.md
 ```
 
 Expected output shape:
@@ -62,13 +62,13 @@ Missing key exits 1 with `No PANGRAM_API_KEY found. Add it to ~/.claude/.env, th
 
 ## The tool
 
-`~/.claude/LIFEOS/TOOLS/PangramScore.ts` — shared, not skill-local, because more than this skill consumes it.
+`$LIFEOS_DIR/TOOLS/PangramScore.ts` — shared, not skill-local, because more than this skill consumes it.
 
 | Invocation | Effect |
 |------------|--------|
-| `bun ~/.claude/LIFEOS/TOOLS/PangramScore.ts "text"` | Score inline text |
-| `bun ~/.claude/LIFEOS/TOOLS/PangramScore.ts --file path.md` | Score a file |
-| `echo "text" \| bun ~/.claude/LIFEOS/TOOLS/PangramScore.ts` | Score stdin — best for long passages |
+| `bun $LIFEOS_DIR/TOOLS/PangramScore.ts "text"` | Score inline text |
+| `bun $LIFEOS_DIR/TOOLS/PangramScore.ts --file path.md` | Score a file |
+| `echo "text" \| bun $LIFEOS_DIR/TOOLS/PangramScore.ts` | Score stdin — best for long passages |
 | add `--json` | Raw API response for parsing |
 
 It submits to `https://text.external-api.pangram.com/task` with an `x-api-key` header, then polls the task until `STAGE_SUCCESS` or `STAGE_FAILED` (60s ceiling). Override the endpoint with `PANGRAM_API_URL` if Pangram moves it.

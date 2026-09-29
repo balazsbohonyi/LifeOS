@@ -4,6 +4,11 @@ version: 1.0.0
 description: Renders the current session's output (analysis, research, red team, report, plan) as an extremely well-designed, self-contained HTML artifact via a deterministic renderer — the model distills content into typed JSON, the tool owns all layout/typography/color. USE WHEN /HTML, HTML artifact, render this as HTML, make this an HTML page, artifact of this analysis, designed HTML output. NOT FOR deployed websites or web apps (build the project directly), web UI design systems (use Webdesign), static images or diagrams (use Art), or writing the underlying analysis itself (run the analysis first, then /HTML renders it).
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 # HTML
 
 Turns whatever the session just produced into one self-contained, designed HTML file and publishes it as an Artifact. Deterministic split: the model's only job is distilling the session output into a typed content JSON and picking a design register; `Tools/Render.ts` owns every layout, typography, and color decision.
@@ -33,7 +38,7 @@ Turns whatever the session just produced into one self-contained, designed HTML 
 
 ## Quick Reference
 
-- Renderer: `bun ~/.claude/skills/HTML/Tools/Render.ts --json content.json --register dossier --out artifact.html`
+- Renderer: `bun $SKILLS_DIR/HTML/Tools/Render.ts --json content.json --register dossier --out artifact.html`
 - `--schema` prints the content JSON shape with an example; `--registers` lists registers.
 - Registers: `dossier` (dark ink-green / orange, condensed display + typewriter — evidence files, red teams, investigations) and `ledger` (dark navy / gold, old-style serif — reports, finance, plans, comparisons). Alternate between them so consecutive outputs don't converge; add new registers to Render.ts rather than hand-styling one-offs.
 - Output is Artifact-CSP safe: inline CSS, fonts embedded as data URIs from local font files, zero external requests.

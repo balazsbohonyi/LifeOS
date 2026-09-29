@@ -37,7 +37,7 @@ import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync } 
 import { atomicWriteText } from "./lib/atomic-write";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
-import { copyMissing, detectDevTree } from "./InstallEngine";
+import { copyMissing, detectDevTree, resolveSetupConfigRoot, setupRuntimeEnvironment } from "./InstallEngine";
 import { findExecutable } from "../../../LIFEOS/TOOLS/RuntimePaths.ts";
 
 // Enhancement components are the à-la-carte half of setup. The "LifeOS Core"
@@ -362,9 +362,8 @@ function deployViaServices(component: LaunchdComponent, ctx: Ctx): ComponentResu
       timeout: 120000, // some services take longer (e.g. Pulse waits for healthz)
       cwd: dirname(servicesTs),
       env: {
-        ...process.env,
+        ...setupRuntimeEnvironment(ctx.configRoot),
         HOME: ctx.home,
-        CLAUDE_CONFIG_DIR: ctx.configRoot,
         LIFEOS_DIR: ctx.lifeosDir,
         LIFEOS_CONFIG_PATH: process.env.LIFEOS_CONFIG_PATH ?? join(ctx.lifeosDir, "USER", "CONFIG", "LIFEOS_CONFIG.toml"),
         LIFEOS_BUN_PATH: ctx.bun,
@@ -409,7 +408,7 @@ function deploy(component: Component, ctx: Ctx): ComponentResult {
 function main(): void {
   const a = process.argv.slice(2);
   const home = process.env.HOME || homedir(); // public issue #1729, @umair-a11y
-  const configRoot = arg(a, "--config-root") || process.env.CLAUDE_CONFIG_DIR || join(home, ".claude");
+  const configRoot = arg(a, "--config-root") || resolveSetupConfigRoot(home);
   const skillRoot = arg(a, "--skill-root") || join(import.meta.dir, "..");
   const apply = a.includes("--apply");
   const allowDev = a.includes("--allow-dev");

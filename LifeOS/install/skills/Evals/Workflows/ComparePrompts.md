@@ -67,7 +67,7 @@ Ask the user:
 
 ```bash
 # Check prompts exist
-ls ~/.claude/skills/Evals/UseCases/<name>/prompts/
+ls "$SKILLS_DIR/Evals/UseCases/<name>/prompts/"
 
 # Should see both versions:
 # v1.0.0.md
@@ -76,7 +76,7 @@ ls ~/.claude/skills/Evals/UseCases/<name>/prompts/
 
 ### Step 3: Create Comparison Config
 
-Create `~/.claude/skills/Evals/UseCases/<name>/comparisons/<comparison-name>.yaml`:
+Create `$SKILLS_DIR/Evals/UseCases/<name>/comparisons/<comparison-name>.yaml`:
 
 ```yaml
 comparison:
@@ -120,8 +120,8 @@ Run the suite once per prompt version via `EvalRunner.ts`. The use-case config e
 
 ```bash
 # Run v1.0.0 first, then v1.1.0
-bun run ~/.claude/skills/Evals/Tools/EvalRunner.ts -s <use-case>-v1.0.0
-bun run ~/.claude/skills/Evals/Tools/EvalRunner.ts -s <use-case>-v1.1.0
+bun run "$SKILLS_DIR/Evals/Tools/EvalRunner.ts" -s <use-case>-v1.0.0
+bun run "$SKILLS_DIR/Evals/Tools/EvalRunner.ts" -s <use-case>-v1.1.0
 ```
 
 Position-swap protection (for pairwise judges that may favor the first/second option presented) is implemented inside the judge config — see the `position_swap: true` flag on `pairwise_comparison` graders in the use-case `config.yaml`. The grader handles randomization; the runner doesn't need a separate flag.
@@ -294,10 +294,10 @@ focus: "depth"
 For detailed comparison setup, use the Comparison template:
 
 ```bash
-bun run ~/.claude/skills/Prompting/Tools/RenderTemplate.ts \
+bun run "$SKILLS_DIR/Prompting/Tools/RenderTemplate.ts" \
   -t Evals/Comparison.hbs \
-  -d ~/.claude/skills/Evals/UseCases/<name>/comparisons/<name>.yaml \
-  -o ~/.claude/skills/Evals/UseCases/<name>/comparisons/<name>-setup.md \
+  -d "$SKILLS_DIR/Evals/UseCases/<name>/comparisons/<name>.yaml" \
+  -o "$SKILLS_DIR/Evals/UseCases/<name>/comparisons/<name>-setup.md" \
   --preview
 ```
 

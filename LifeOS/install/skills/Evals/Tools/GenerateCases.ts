@@ -17,13 +17,13 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
 import { parseArgs } from 'node:util';
 import { stringify as toYaml } from 'yaml';
 import { inference } from '../../../LIFEOS/TOOLS/Inference.ts';
+import { resolveRuntimePaths } from '../../../LIFEOS/TOOLS/RuntimePaths.ts';
 import type { Assertion } from './Assertions.ts';
 
-const DRAFTS_DIR = join(homedir(), '.claude', 'LIFEOS', 'USER', 'CUSTOMIZATIONS', 'SKILLS', 'Evals', 'Suites', '_drafts');
+const DRAFTS_DIR = join(resolveRuntimePaths().userDir, 'CUSTOMIZATIONS', 'SKILLS', 'Evals', 'Suites', '_drafts');
 
 interface DraftCase {
   id: string;

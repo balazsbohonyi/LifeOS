@@ -20,14 +20,14 @@ Running **Score** in **DetectAI**...
 Already built and shared — do not rebuild it or reimplement the API call inline.
 
 ```
-~/.claude/LIFEOS/TOOLS/PangramScore.ts
+$LIFEOS_DIR/TOOLS/PangramScore.ts
 ```
 
 | User intent | Invocation |
 |-------------|------------|
-| Score text pasted into the conversation | `bun ~/.claude/LIFEOS/TOOLS/PangramScore.ts "text"` |
-| Score a file | `bun ~/.claude/LIFEOS/TOOLS/PangramScore.ts --file path.md` |
-| Score a long passage (safest — no shell quoting to mangle) | `echo "text" \| bun ~/.claude/LIFEOS/TOOLS/PangramScore.ts` |
+| Score text pasted into the conversation | `bun $LIFEOS_DIR/TOOLS/PangramScore.ts "text"` |
+| Score a file | `bun $LIFEOS_DIR/TOOLS/PangramScore.ts --file path.md` |
+| Score a long passage (safest — no shell quoting to mangle) | `echo "text" \| bun $LIFEOS_DIR/TOOLS/PangramScore.ts` |
 | Need the raw numbers to build a table | add `--json` |
 
 Output: headline verdict, `AI%` / `AI-assisted%` / `Human%`, segment counts. **Lower AI% = reads more human.**

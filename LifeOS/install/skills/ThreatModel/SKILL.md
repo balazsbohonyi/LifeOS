@@ -4,6 +4,11 @@ version: 1.0.1
 description: Defensive threat modeling and risk management for your own estate — map where sensitive data lives across your asset graph, run compromise scenarios (what a hacked asset exposes, its blast radius, how you'd respond), and maintain a persistent risk register with likelihood×impact scoring, owners, mitigations, and review cadence via a deterministic CLI. All real data stays in your private USER tree; this skill is code only. USE WHEN threat model, threat modeling, risk register, risk assessment, what if X got hacked, compromise scenario, blast radius, sensitive data map, where is our sensitive data, data classification, risk review, add a risk, accept a risk, security risk posture. NOT FOR active pentesting or exploitation (use an offensive-security skill), world-scale futures stress-testing of ideas (use WorldThreatModel), or executing incident response (use your incident-response runbooks — this skill plans them).
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 # ThreatModel
 
 Threat modeling for the estate you actually run. Three moves: classify where sensitive data lives, simulate compromise of the assets that hold it, and keep the resulting risks in a register that gets reviewed instead of forgotten.
@@ -11,7 +16,7 @@ Threat modeling for the estate you actually run. Three moves: classify where sen
 ## Customization
 
 **Before executing, check for user customizations at:**
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/ThreatModel/`
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/ThreatModel/`
 
 If this directory exists, load and apply `PREFERENCES.md` (data locations, sensitive-data class priorities, response runbook cross-references). If not, proceed with defaults.
 
@@ -20,7 +25,7 @@ If this directory exists, load and apply `PREFERENCES.md` (data locations, sensi
 **This skill directory is public code. It must never contain data.**
 
 - Every artifact a workflow produces — scenario docs, data classifications, register entries — is written to the private data directory, never into this skill tree.
-- Default data dir: `~/.claude/LIFEOS/USER/SECURITY/THREATMODEL/` (release-excluded USER tree). Override with `THREATMODEL_DATA_DIR`.
+- Default data dir: `$LIFEOS_DIR/USER/SECURITY/THREATMODEL/` (release-excluded USER tree). Override with `THREATMODEL_DATA_DIR`.
 - `Tools/RiskRegister.ts` structurally refuses any data dir that resolves inside a `skills/` path.
 - Register entries reference credentials by env-var NAME only — never values. No tokens, keys, or cookies anywhere in threat-model output.
 
@@ -52,19 +57,19 @@ If this directory exists, load and apply `PREFERENCES.md` (data locations, sensi
 
 ## Asset Graph Integration
 
-If the install has Atlas (`~/.claude/LIFEOS/ATLAS/Atlas.ts`), workflows use it as the current-state source of truth:
+If the install has Atlas (`$LIFEOS_DIR/ATLAS/Atlas.ts`), workflows use it as the current-state source of truth:
 
 ```bash
-bun ~/.claude/LIFEOS/ATLAS/Atlas.ts blast <key>     # what relies on this asset
-bun ~/.claude/LIFEOS/ATLAS/Atlas.ts owns <key>      # what deleting/losing it orphans
-bun ~/.claude/LIFEOS/ATLAS/Atlas.ts exposed <key>   # which credentials it would leak, priority-ordered
-bun ~/.claude/LIFEOS/ATLAS/Atlas.ts sql "SELECT ..."  # read-only census queries
+bun $LIFEOS_DIR/ATLAS/Atlas.ts blast <key>     # what relies on this asset
+bun $LIFEOS_DIR/ATLAS/Atlas.ts owns <key>      # what deleting/losing it orphans
+bun $LIFEOS_DIR/ATLAS/Atlas.ts exposed <key>   # which credentials it would leak, priority-ordered
+bun $LIFEOS_DIR/ATLAS/Atlas.ts sql "SELECT ..."  # read-only census queries
 ```
 
 `exposed` makes the "one hop of trust" step deterministic instead of a judgment call: it returns the credentials an asset holds, transitively through what it owns, compromise-tier first. Pair it with a DEPENDS_ON query for the data stores an asset can reach:
 
 ```bash
-bun ~/.claude/LIFEOS/ATLAS/Atlas.ts sql "SELECT a.kind, a.canonical_key FROM edge e JOIN asset a ON a.id=e.dst WHERE e.kind='DEPENDS_ON' AND e.status='active' AND e.src=(SELECT id FROM asset WHERE canonical_key='<key>')"
+bun $LIFEOS_DIR/ATLAS/Atlas.ts sql "SELECT a.kind, a.canonical_key FROM edge e JOIN asset a ON a.id=e.dst WHERE e.kind='DEPENDS_ON' AND e.status='active' AND e.src=(SELECT id FROM asset WHERE canonical_key='<key>')"
 ```
 
 Without Atlas, workflows fall back to what the user enumerates plus repo/config inspection — and say so in the output. Never invent an inventory.

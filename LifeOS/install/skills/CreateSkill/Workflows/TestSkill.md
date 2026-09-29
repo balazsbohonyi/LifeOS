@@ -22,7 +22,7 @@ Running the **TestSkill** workflow in the **CreateSkill** skill to test skill ef
 Read the target skill's SKILL.md:
 
 ```
-~/.claude/skills/[path]/SKILL.md
+$SKILLS_DIR/[path]/SKILL.md
 ```
 
 Note the skill's:

@@ -9,7 +9,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { homedir } from "node:os"
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts"
 
 import { readHometown, NoHometownError } from "./Hometown.ts"
 import { claudeFill } from "./ClaudeFill.ts"
@@ -28,10 +28,9 @@ import { fetchCrime } from "./FetchCrime.ts"
 // Serving plane: the Pulse module reads CUSTOMIZATIONS latest.json FIRST
 // (user-scoped primary path) — both latest copies are written on every persist
 // so the module and the history endpoint never diverge again.
-const DATA_DIR = join(homedir(), ".claude", "LIFEOS", "MEMORY", "DATA", "LocalIntelligence")
-const CUSTOMIZATIONS_DIR = join(
-  homedir(), ".claude", "LIFEOS", "USER", "CUSTOMIZATIONS", "SKILLS", "LocalIntelligence"
-)
+const RUNTIME_PATHS = resolveRuntimePaths()
+const DATA_DIR = join(RUNTIME_PATHS.memoryDir, "DATA", "LocalIntelligence")
+const CUSTOMIZATIONS_DIR = join(RUNTIME_PATHS.userDir, "CUSTOMIZATIONS", "SKILLS", "LocalIntelligence")
 
 const fetchers: Record<SectionKey, Fetcher> = {
   construction: fetchConstruction,

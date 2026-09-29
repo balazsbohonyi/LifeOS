@@ -7,14 +7,18 @@ argument-hint: "[setup|interview|doctor|update|uninstall]"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
+## Active Runtime Paths
+
+Resolve the active harness config root before running setup tools. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is `<config root>/LIFEOS`, `$SKILLS_DIR` is `<config root>/skills`, and `$LIFEOS_SKILL_DIR` is this installed skill directory. Codex markers take precedence over stale Claude settings.
+
 # LifeOS
 
 > **This is the INSTALLED copy of the LifeOS skill, not the distribution root.**
 > Its `install/` directory holds only bootstrap files; the whole-system payload lived in the
-> release artifact you installed FROM and is now deployed across `~/.claude`. Statements below
-> about the skill being self-contained describe that release artifact, not this directory.
-> Run the setup and deploy tools from `~/.claude`, not from here — relative paths do not
-> resolve in this copy.
+> release artifact you installed FROM and is now deployed under the active harness config root.
+> Statements below about the skill being self-contained describe that release artifact, not this
+> directory. Run setup and deploy tools from the installed LifeOS skill directory
+> (`$LIFEOS_SKILL_DIR`) so relative tool paths resolve on every supported harness.
 
 
 The install + onboarding surface for **LifeOS** — the Life Operating System. One command takes a stranger on any harness from nothing to a working, personalized install whose Pulse dashboard already shows their current state vs ideal state — without making them adopt a whole new harness.

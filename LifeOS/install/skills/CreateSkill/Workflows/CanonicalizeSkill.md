@@ -20,7 +20,7 @@ Running the **CanonicalizeSkill** workflow in the **CreateSkill** skill to restr
 **REQUIRED FIRST:** Read the canonical structure:
 
 ```
-~/.claude/LIFEOS/DOCUMENTATION/Skills/SkillSystem.md
+$LIFEOS_DIR/DOCUMENTATION/Skills/SkillSystem.md
 ```
 
 This defines exactly what "canonicalize" means.
@@ -30,7 +30,7 @@ This defines exactly what "canonicalize" means.
 ## Step 2: Read the Current Skill
 
 ```bash
-~/.claude/skills/[skill-name]/SKILL.md
+$SKILLS_DIR/[skill-name]/SKILL.md
 ```
 
 Identify what's wrong:
@@ -47,7 +47,7 @@ Identify what's wrong:
 ## Step 3: Backup
 
 ```bash
-cp -r ~/.claude/skills/[skill-name]/ ~/.claude/History/Backups/[skill-name]-backup-$(date +%Y%m%d)/
+cp -r $SKILLS_DIR/[skill-name]/ ~/.claude/History/Backups/[skill-name]-backup-$(date +%Y%m%d)/
 ```
 
 **Note:** Backups go to `~/.claude/History/Backups/`, NEVER inside skill directories.
@@ -85,7 +85,7 @@ cp -r ~/.claude/skills/[skill-name]/ ~/.claude/History/Backups/[skill-name]-back
 **Rename files if needed:**
 ```bash
 # Example: rename workflow files
-cd ~/.claude/skills/[SkillName]/Workflows/
+cd $SKILLS_DIR/[SkillName]/Workflows/
 mv create.md Create.md
 mv update-info.md UpdateInfo.md
 mv sync_repo.md SyncRepo.md
@@ -103,7 +103,7 @@ Scan for folders deeper than 2 levels:
 
 ```bash
 # Find any folders 3+ levels deep (FORBIDDEN)
-find ~/.claude/skills/[SkillName]/ -type d -mindepth 2 -maxdepth 3
+find $SKILLS_DIR/[SkillName]/ -type d -mindepth 2 -maxdepth 3
 ```
 
 ### ❌ Common Violations to Fix
@@ -224,7 +224,7 @@ If the markdown body already had routing information in a different format, cons
 
 List workflow files:
 ```bash
-ls ~/.claude/skills/[SkillName]/Workflows/
+ls $SKILLS_DIR/[SkillName]/Workflows/
 ```
 
 For EACH file:

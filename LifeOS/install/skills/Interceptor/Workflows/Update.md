@@ -122,7 +122,7 @@ The signed `.pkg` installers place the Chrome extension for you — this step on
 applies to a from-source build.
 
 `Tools/Pin.sh` copies the built `extension/dist/` into
-`~/.claude/skills/Interceptor/Extension/`, **creating that directory on first
+`$SKILLS_DIR/Interceptor/Extension/`, **creating that directory on first
 run**. It does not ship with the skill; it exists only once you have pinned a
 build into it. Chrome then loads that stable copy rather than the build tree,
 which matters because a rebuild rewrites `dist/` in place and Chrome disables an
@@ -131,14 +131,14 @@ unpacked extension when the manifest version changes underneath it.
 Re-pin after every build:
 
 ```bash
-bash ~/.claude/skills/Interceptor/Tools/Pin.sh
+bash $SKILLS_DIR/Interceptor/Tools/Pin.sh
 ```
 
 **Gotcha (2026-08-07, 0.22.37 → 0.23.3):** `extension/dist/` is gitignored, so macOS Finder-duplicate cruft (`icon128 3.png`, `tesseract-core-simd-lstm 2.wasm` — a space then a digit before the extension) can accumulate there across builds. `bun run build` does NOT remove it. Those spaces break `Pin.sh`'s `xargs shasum` content-hash loop (line 56, unquoted), so Pin.sh dies under `set -e` **after** rsyncing the new manifest into `Extension/` but **before** rewriting `PINNED_FROM.txt` — leaving the pin inconsistent (new manifest, stale `PINNED_FROM.txt` version + SHA). Clean the cruft from source first, then re-pin:
 
 ```bash
 find "$INTERCEPTOR_SRC"/extension/dist \( -name "* 2.*" -o -name "* 3.*" \) -delete
-bash ~/.claude/skills/Interceptor/Tools/Pin.sh   # exit 0, prints "✓ pinned + scrubbed (v<X>, sha …)"
+bash $SKILLS_DIR/Interceptor/Tools/Pin.sh   # exit 0, prints "✓ pinned + scrubbed (v<X>, sha …)"
 ```
 
 Confirm `Extension/PINNED_FROM.txt` shows the new `Manifest version:` and a fresh `Pinned at:`. (Durable fix would quote line 56's loop like the leak-guard's `-print0` at line 69.)
@@ -270,7 +270,7 @@ If `Extension/manifest.json` changed (especially `version` or `key`):
 
 1. Open `chrome://extensions`, enable Developer Mode.
 2. **Delete** the existing Interceptor card (don't just hit reload — if the manifest `key` changed, the extension ID changed and the old card is dead).
-3. **Load unpacked** → `~/.claude/skills/Interceptor/Extension` (the copy `Tools/Pin.sh` created in step 4a — NOT a symlink; it does not auto-follow upstream, so it must be re-pinned after every build). If you installed from the signed `.pkg` instead of building, the installer already registered the extension — skip this step.
+3. **Load unpacked** → `$SKILLS_DIR/Interceptor/Extension` (the copy `Tools/Pin.sh` created in step 4a — NOT a symlink; it does not auto-follow upstream, so it must be re-pinned after every build). If you installed from the signed `.pkg` instead of building, the installer already registered the extension — skip this step.
 4. Quit Chrome fully (⌘Q, not just close window) and relaunch — service worker needs a clean restart, especially with `userScripts` permission added.
 5. Accept any new permission prompts (`userScripts`, etc.).
 

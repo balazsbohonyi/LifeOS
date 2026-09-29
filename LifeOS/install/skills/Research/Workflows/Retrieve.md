@@ -403,12 +403,12 @@ mcp__Apify__apify-slash-rag-web-browser({
 
 ## 📁 Working Files → History Pattern
 
-**Working Directory:** `~/.claude/LIFEOS/MEMORY/WORK/{current_work}/`
+**Working Directory:** `$LIFEOS_DIR/MEMORY/WORK/{current_work}/`
 
 **Getting Current Work Directory:**
 1. Read `~/.claude/`
 2. Extract the `work_dir` value
-3. Use `~/.claude/LIFEOS/MEMORY/WORK/{work_dir}/` for temporary artifacts
+3. Use `$LIFEOS_DIR/MEMORY/WORK/{work_dir}/` for temporary artifacts
 
 **Process:**
 
@@ -436,7 +436,7 @@ mcp__Apify__apify-slash-rag-web-browser({
 
 **Working files (in current work item directory):**
 ```
-~/.claude/LIFEOS/MEMORY/WORK/{slug}/
+$LIFEOS_DIR/MEMORY/WORK/{slug}/
 ├── raw-content/
 │   ├── page1.md (Layer 2 output)
 │   ├── page2.md (Layer 2 output)

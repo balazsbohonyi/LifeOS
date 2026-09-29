@@ -19,32 +19,32 @@ for (const __k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
  * Usage:
  *   generate --model nano-banana-pro --prompt "..." --size 16:9 --output /tmp/image.png
  *
- * @see ~/.claude/skills/Art/SKILL.md
+ * @see the installed Art/SKILL.md
  */
 
 import Replicate from "replicate";
 import { GoogleGenAI } from "@google/genai";
 import { writeFile, readFile } from "node:fs/promises";
-import { extname, resolve } from "node:path";
+import { extname, join, resolve } from "node:path";
 import { getDAName } from "../../../hooks/lib/identity";
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts";
+
+const RUNTIME_PATHS = resolveRuntimePaths();
 
 // ============================================================================
 // Environment Loading
 // ============================================================================
 
 /**
- * Load environment variables from ${LIFEOS_DIR}/.env
+ * Load environment variables from the active runtime's .env files.
  * This ensures API keys are available regardless of how the CLI is invoked
  */
 async function loadEnv(): Promise<void> {
-  // The canonical .env lives at ~/.claude/.env — LIFEOS_DIR often points at the
-  // ~/.claude/LIFEOS SUBdirectory, which has no .env, and the silent catch made
-  // present keys invisible (public issue #1515, @xmasyx). Try LIFEOS_DIR first,
-  // then the canonical location; load the first that exists.
-  const home = process.env.HOME!;
+  // Check the active LifeOS directory first, then the harness config root. The
+  // resolver filters stale Claude paths when this process belongs to Codex.
   const candidates = Array.from(new Set([
-    ...(process.env.LIFEOS_DIR ? [resolve(process.env.LIFEOS_DIR, '.env')] : []),
-    resolve(home, '.claude', '.env'),
+    resolve(RUNTIME_PATHS.lifeosDir, ".env"),
+    RUNTIME_PATHS.envPath,
   ]));
   for (const envPath of candidates) {
     let envContent: string;
@@ -224,7 +224,7 @@ async function detectMimeType(filePath: string): Promise<string> {
 // ============================================================================
 
 // LifeOS directory for documentation paths
-const LIFEOS_DIR = process.env.LIFEOS_DIR || `${process.env.HOME}/.claude`;
+const SKILLS_DIR = join(RUNTIME_PATHS.configRoot, "skills");
 
 function showHelp(): void {
   console.log(`
@@ -316,8 +316,8 @@ ERROR CODES:
   1  General error (invalid arguments, API error, file write error)
 
 MORE INFO:
-  Documentation: ${LIFEOS_DIR}/skills/Art/README.md
-  Source: ${LIFEOS_DIR}/skills/Art/Tools/Generate.ts
+  Documentation: ${SKILLS_DIR}/Art/README.md
+  Source: ${SKILLS_DIR}/Art/Tools/Generate.ts
 `);
   process.exit(0);
 }
@@ -343,7 +343,7 @@ MORE INFO:
  *   --workflow=<bad-name>   → exit 1 listing valid workflow names.
  */
 function enforceWorkflowDiscipline(parsed: Partial<CLIArgs>): void {
-  const workflowsDir = `${process.env.HOME}/.claude/skills/Art/Workflows`;
+  const workflowsDir = join(RUNTIME_PATHS.configRoot, "skills", "Art", "Workflows");
   let availableWorkflows: string[] = [];
   try {
     // readdirSync via Bun.readdirSync isn't a thing; use Node fs sync via dynamic

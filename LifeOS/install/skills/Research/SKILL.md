@@ -6,6 +6,11 @@ context: fork
 background: false
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 ## ⚠️ MANDATORY TRIGGER
 
 **When user says "research" (in any form), ALWAYS invoke this skill.**
@@ -24,7 +29,7 @@ background: false
 ## Customization
 
 **Before executing, check for user customizations at:**
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Research/`
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Research/`
 
 If this directory exists, load and apply any PREFERENCES.md, configurations, or resources found there. These override default behavior. If the directory does not exist, proceed with skill defaults.
 
@@ -186,7 +191,7 @@ See `Workflows/Verify.md` for full verification protocol.
 → Exit: When all CRITICAL/HIGH entities researched + all categories covered
 ```
 
-**Artifacts persist** at `~/.claude/LIFEOS/MEMORY/RESEARCH/{date}_{topic}/` — the vault survives across sessions.
+**Artifacts persist** at `$LIFEOS_DIR/MEMORY/RESEARCH/{date}_{topic}/` — the vault survives across sessions.
 
 See `Workflows/DeepInvestigation.md` for full workflow details.
 
@@ -194,7 +199,7 @@ See `Workflows/DeepInvestigation.md` for full workflow details.
 
 ## File Organization
 
-**Working files (temporary work artifacts):** `~/.claude/LIFEOS/MEMORY/WORK/{current_work}/`
+**Working files (temporary work artifacts):** `$LIFEOS_DIR/MEMORY/WORK/{current_work}/`
 - Read `~/.claude/` to get the `work_dir` value
 - All iterative work artifacts go in the current work item directory
 - This ties research artifacts to the work item for learning and context
@@ -255,7 +260,7 @@ User: "do a deep investigation of the AI agent market"
 After completing any workflow, append a single JSONL entry:
 
 ```bash
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Research","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> ~/.claude/LIFEOS/MEMORY/SKILLS/execution.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Research","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> $LIFEOS_DIR/MEMORY/SKILLS/execution.jsonl
 ```
 
 Replace `WORKFLOW_USED` with the workflow executed, `8_WORD_SUMMARY` with a brief input description, and `SECONDS` with approximate wall-clock time. Log `status: "error"` if the workflow failed.

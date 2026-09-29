@@ -18,6 +18,9 @@ export interface RuntimePathEnvironment {
   LIFEOS_CONFIG_PATH?: string;
   CLAUDE_CONFIG_DIR?: string;
   CODEX_HOME?: string;
+  CODEX_THREAD_ID?: string;
+  CODEX_SESSION_ID?: string;
+  CODEX_SANDBOX?: string;
   HOME?: string;
   USERPROFILE?: string;
   PATH?: string;
@@ -65,6 +68,12 @@ export type RuntimeEnvironmentTarget = Pick<
   "HOME" | "CLAUDE_CONFIG_DIR" | "LIFEOS_DIR" | "LIFEOS_CONFIG_PATH" | "PULSE_DIR"
 >;
 
+function samePath(left: string, right: string): boolean {
+  const a = normalize(left);
+  const b = normalize(right);
+  return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+
 function absolute(path: string, base: string): string {
   return normalize(isAbsolute(path) ? path : resolve(base, path));
 }
@@ -73,7 +82,12 @@ function deployedLifeosDir(toolDir: string): string | undefined {
   const normalizedToolDir = normalize(toolDir);
   if (basename(normalizedToolDir).toLowerCase() !== "tools") return undefined;
   const candidate = dirname(normalizedToolDir);
-  return basename(candidate).toLowerCase() === "lifeos" ? candidate : undefined;
+  if (basename(candidate).toLowerCase() !== "lifeos") return undefined;
+  // The repository payload is stored at LifeOS/install/LIFEOS/TOOLS. Running
+  // source tools there must still target the user's active harness, never the
+  // checked-out release payload.
+  if (basename(dirname(candidate)).toLowerCase() === "install") return undefined;
+  return candidate;
 }
 
 function defaultToolDir(): string {
@@ -83,18 +97,26 @@ function defaultToolDir(): string {
 /**
  * Resolution precedence:
  *   1. explicit arguments
- *   2. LIFEOS_DIR / CLAUDE_CONFIG_DIR / CODEX_HOME environment overrides
+ *   2. LIFEOS_DIR / active-harness config-root environment overrides
  *   3. the deployed location of this module
  *   4. legacy ~/.claude/LIFEOS
  */
 export function resolveRuntimePaths(options: ResolveRuntimePathOptions = {}): RuntimePaths {
   const env = options.env ?? process.env;
-  const home = absolute(options.home ?? env.HOME ?? env.USERPROFILE ?? homedir(), process.cwd());
+  const home = absolute(options.home ?? (env.HOME || env.USERPROFILE || homedir()), process.cwd());
   const toolDir = absolute(options.toolDir ?? defaultToolDir(), home);
   const deployed = deployedLifeosDir(toolDir);
 
-  const explicitConfigRoot = options.configRoot ?? env.CLAUDE_CONFIG_DIR ?? env.CODEX_HOME;
-  const explicitLifeosDir = options.lifeosDir ?? env.LIFEOS_DIR;
+  const codexRuntimeKnown = Boolean(env.CODEX_HOME || env.CODEX_THREAD_ID || env.CODEX_SESSION_ID || env.CODEX_SANDBOX);
+  const lifeosCandidate = options.lifeosDir ?? env.LIFEOS_DIR;
+  const explicitLifeosDir = codexRuntimeKnown && lifeosCandidate
+    && samePath(absolute(lifeosCandidate, home), join(home, ".claude", "LIFEOS"))
+    ? undefined
+    : lifeosCandidate;
+  const explicitConfigRoot = options.configRoot
+    ?? (codexRuntimeKnown
+      ? env.CODEX_HOME ?? (explicitLifeosDir ? undefined : join(home, ".codex"))
+      : env.CLAUDE_CONFIG_DIR ?? env.CODEX_HOME);
 
   let lifeosDir: string;
   let configRoot: string;
@@ -111,7 +133,7 @@ export function resolveRuntimePaths(options: ResolveRuntimePathOptions = {}): Ru
     lifeosDir = deployed;
     configRoot = dirname(lifeosDir);
   } else {
-    configRoot = join(home, ".claude");
+    configRoot = join(home, codexRuntimeKnown ? ".codex" : ".claude");
     lifeosDir = join(configRoot, "LIFEOS");
   }
 

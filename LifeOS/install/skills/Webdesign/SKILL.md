@@ -5,6 +5,11 @@ description: "Design and integrate web interfaces via three paths: DirectDesign 
 license: Complete terms in LICENSE.txt
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 ## Voice Notification (REQUIRED FIRST ACTION)
 
 ```bash
@@ -61,7 +66,7 @@ When invoked standalone for a greenfield design, the skill produces a self-conta
 User-specific design preferences (color palette, typography, spacing grid, animation timing, framework defaults) live at:
 
 ```
-~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Webdesign/
+$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Webdesign/
 ├── PREFERENCES.md     # Design tokens, preferred frameworks
 ├── README.md
 └── EXTEND.yaml

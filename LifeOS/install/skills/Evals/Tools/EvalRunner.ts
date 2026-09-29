@@ -20,16 +20,16 @@
 
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
 import { parse as parseYaml } from 'yaml';
 import { parseArgs } from 'node:util';
 import { evaluateDeterministic, isModelAssert, type Assertion, type AssertResult } from './Assertions.ts';
 import { judgeAssertion } from './Judge.ts';
 import { inference, type InferenceLevel } from '../../../LIFEOS/TOOLS/Inference.ts';
+import { resolveRuntimePaths } from '../../../LIFEOS/TOOLS/RuntimePaths.ts';
 
-const CLAUDE_ROOT = join(homedir(), '.claude');
-const RESULTS_DIR = join(CLAUDE_ROOT, 'LIFEOS', 'MEMORY', 'STATE', 'Evals-Results');
-const USER_SUITES = join(CLAUDE_ROOT, 'LIFEOS', 'USER', 'CUSTOMIZATIONS', 'SKILLS', 'Evals', 'Suites');
+const RUNTIME_PATHS = resolveRuntimePaths();
+const RESULTS_DIR = join(RUNTIME_PATHS.memoryDir, 'STATE', 'Evals-Results');
+const USER_SUITES = join(RUNTIME_PATHS.userDir, 'CUSTOMIZATIONS', 'SKILLS', 'Evals', 'Suites');
 const SKILL_SUITES = join(import.meta.dir, '..', 'Suites');
 
 export interface EvalCase {
@@ -73,8 +73,8 @@ export interface SuiteResult {
 
 export function buildLiveSystemPrompt(): string {
   const sources = [
-    join(CLAUDE_ROOT, 'LIFEOS', 'LIFEOS_SYSTEM_PROMPT.md'),
-    join(CLAUDE_ROOT, 'LIFEOS', 'USER', 'DIGITAL_ASSISTANT', 'DA_IDENTITY.md'),
+    join(RUNTIME_PATHS.lifeosDir, 'LIFEOS_SYSTEM_PROMPT.md'),
+    join(RUNTIME_PATHS.userDir, 'DIGITAL_ASSISTANT', 'DA_IDENTITY.md'),
   ];
   const parts = sources.filter(existsSync).map((f) => readFileSync(f, 'utf-8'));
   return parts.length ? parts.join('\n\n---\n\n') : 'You are a precise assistant. Verify before claiming done; be concise.';

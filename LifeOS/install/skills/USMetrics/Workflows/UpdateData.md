@@ -39,12 +39,12 @@ Running **UpdateData** in **USMetrics**...
 Execute the update script:
 
 ```bash
-bun ~/.claude/skills/USMetrics/Tools/UpdateSubstrateMetrics.ts
+bun $SKILLS_DIR/USMetrics/Tools/UpdateSubstrateMetrics.ts
 ```
 
 This tool:
 1. Fetches current values from all configured APIs
-2. Writes to `US-Common-Metrics.md` in the dataset directory — `$USMETRICS_DATA_DIR` if set, otherwise `~/.claude/LIFEOS/USER/DATA/US-Common-Metrics/`
+2. Writes to `US-Common-Metrics.md` in the dataset directory — `$USMETRICS_DATA_DIR` if set, otherwise `$LIFEOS_DIR/USER/DATA/US-Common-Metrics/`
 3. Exports to `us-metrics-current.csv`
 4. Appends to `us-metrics-historical.csv` (with timestamp)
 5. Logs update status

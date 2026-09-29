@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { PULSE_BASE } from "../../../LIFEOS/PULSE/endpoint";
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts";
 
 type FlagValue = string | boolean;
 type ParsedArgs = {
@@ -45,6 +46,7 @@ type MonitorState = {
 };
 
 const DEFAULT_TIMEOUT_MS = 20_000;
+const RUNTIME_PATHS = resolveRuntimePaths();
 const LAUNCH_TIMEOUT_MS = 5_000;
 const PING_WAIT_MS = 15_000;
 const PING_INTERVAL_MS = 750;
@@ -55,7 +57,7 @@ function usageText(): string {
   return `cmux.ts - JSON CLI wrapper for the cmux GUI terminal multiplexer
 
 USAGE:
-  bun ~/.claude/skills/CMUX/Tools/cmux.ts <subcommand> [options]
+  bun "$SKILLS_DIR/CMUX/Tools/cmux.ts" <subcommand> [options]
 
 SUBCOMMANDS:
   ping                                      Ensure cmux is up and return version
@@ -658,11 +660,11 @@ function isHostConfig(value: unknown): value is HostConfig {
 }
 
 function loadFleetConfig(): HostConfig[] | JsonObject {
-  const configPath = join(homedir(), ".claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/CMUX/fleet.json");
+  const configPath = join(RUNTIME_PATHS.userDir, "CUSTOMIZATIONS", "SKILLS", "CMUX", "fleet.json");
   if (!existsSync(configPath)) {
     return {
       ok: false,
-      error: "No hosts configured. Pass --hosts name=ssh,name2=ssh2 or create ~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/CMUX/fleet.json with {\"hosts\":[{\"name\":\"...\",\"ssh\":\"...\"}]}",
+      error: `No hosts configured. Pass --hosts name=ssh,name2=ssh2 or create ${configPath} with {\"hosts\":[{\"name\":\"...\",\"ssh\":\"...\"}]}`,
     };
   }
 

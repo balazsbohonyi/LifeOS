@@ -144,7 +144,7 @@ Or use the slash command:
 **Read the aesthetic file and select the appropriate emotional vocabulary.**
 
 ```bash
-Read ~/.claude/skills/Art/SKILL.md
+Read $SKILLS_DIR/Art/SKILL.md
 ```
 
 **Match the contVent to one of these emotional registers:**
@@ -581,7 +581,7 @@ The strict pipeline:
 
 ```bash
 # 1. GENERATE → ALWAYS to "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}"/
-bun run ~/.claude/skills/Art/Tools/Generate.ts \
+bun run $SKILLS_DIR/Art/Tools/Generate.ts \
   --workflow=Essay \
   --model nano-banana-pro \
   --prompt "[YOUR PROMPT]" \
@@ -614,7 +614,7 @@ cd ~/your-site && git add public/images/[name].*
 Based on user's request and the mapping tables above, construct the CLI command:
 
 ```bash
-bun run ~/.claude/skills/Art/Tools/Generate.ts \
+bun run $SKILLS_DIR/Art/Tools/Generate.ts \
   --workflow=Essay \
   --model [SELECTED_MODEL from table] \
   --prompt "[PROMPT from Step 5]" \
@@ -637,7 +637,7 @@ The `--thumbnail` flag generates TWO versions:
 ```bash
 # Example: Generates both my-header.png AND my-header-thumb.png in "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}"/
 # 🚨 --output MUST point to "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}"/ — NEVER directly into cms/public/images/
-bun run ~/.claude/skills/Art/Tools/Generate.ts \
+bun run $SKILLS_DIR/Art/Tools/Generate.ts \
   --workflow=Essay \
   --model nano-banana-pro \
   --prompt "[YOUR PROMPT]" \
@@ -685,10 +685,10 @@ For non-blog images that only need transparency, or to remove backgrounds after 
 ```bash
 # Background removal — Art skill tool (Images was retired into Art)
 # ported from public PR #1707 (commit 1), @anikinsasha
-bun ~/.claude/LIFEOS/TOOLS/RemoveBg.ts /path/to/output.png
+bun $LIFEOS_DIR/TOOLS/RemoveBg.ts /path/to/output.png
 
 # Or batch process multiple images
-bun ~/.claude/LIFEOS/TOOLS/RemoveBg.ts image1.png image2.png image3.png
+bun $LIFEOS_DIR/TOOLS/RemoveBg.ts image1.png image2.png image3.png
 ```
 
 
@@ -747,7 +747,7 @@ magick "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}"/[name]-trimmed.png -resize 102
 
 # Stage C — verify margins are now ≤ 2% on every edge (sanity check; any model whitespace inside
 # the bbox stays, but cropping has eliminated background bleed).
-bun ~/.claude/skills/Art/Tools/FillFrame.ts \
+bun $SKILLS_DIR/Art/Tools/FillFrame.ts \
   "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}"/[name]-resized.png \
   "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}"/[name]-resized.png \
   --report-only \
@@ -779,7 +779,7 @@ Generated images at 2K resolution (2048x2048) are 6-8MB each - far too large for
 # Step 7.0 (above) has already trimmed the image to its bbox.
 
 # 7.0.5 — CUT TO TRUE ALPHA (mandatory; the model output is an opaque JPEG)
-bun ~/.claude/LIFEOS/TOOLS/RemoveBg.ts "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}/[name].jpg"   # → "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}"/[name].png with real alpha
+bun $LIFEOS_DIR/TOOLS/RemoveBg.ts "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}/[name].jpg"   # → "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}"/[name].png with real alpha
 magick "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}/[name].png" -trim +repage -resize 1024x "${LIFEOS_DOWNLOADS_DIR:-$HOME/Downloads}/[name].png"
 
 # 7.1 — "{{DA_NAME}}" SIGNATURE (human handwriting, NOT calligraphy)
@@ -1095,7 +1095,7 @@ The cap exists because compute spent on 16+ failed generations is compute that s
 ```
 1. UNDERSTAND → Deeply read and comprehend the content
 2. CSE-24 → Run Create Story Explanation (24 items) to extract narrative arc
-3. EMOTION → Match to register in ~/.claude/LIFEOS/aesthetic.md
+3. EMOTION → Match to register in $LIFEOS_DIR/aesthetic.md
 4. COMPOSITION → Design what to DRAW (content-relevant, NOT defaulting to architecture)
 5. PROMPT → Build using charcoal sketch TECHNIQUE template
 6. GENERATE → Execute with nano-banana-pro + --thumbnail flag

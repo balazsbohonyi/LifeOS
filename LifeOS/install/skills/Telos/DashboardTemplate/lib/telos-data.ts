@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import os from 'os'
+import { getDashboardRuntimePaths } from './runtime-paths'
 
 export interface TelosFile {
   name: string
@@ -9,7 +9,7 @@ export interface TelosFile {
   type: 'markdown' | 'csv'
 }
 
-const TELOS_DIR = path.join(os.homedir(), '.claude/LIFEOS/USER/TELOS')
+const TELOS_DIR = path.join(getDashboardRuntimePaths().userDir, 'TELOS')
 
 export function getAllTelosData(): TelosFile[] {
   const files: TelosFile[] = []

@@ -9,11 +9,12 @@ import { existsSync, mkdirSync, readdirSync, writeFileSync, readFileSync } from 
 import { join, basename } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { parseArgs } from 'util';
+import { resolveRuntimePaths } from '../../../LIFEOS/TOOLS/RuntimePaths.ts';
 
 const EVALS_DIR = join(import.meta.dir, '..');
 const SUITES_DIR = join(EVALS_DIR, 'Suites');
 // Run artifacts live outside the skill tree (runtime state, not skill content).
-const RESULTS_DIR = join(EVALS_DIR, '..', '..', 'LifeOS', 'MEMORY', 'STATE', 'Evals-Results');
+const RESULTS_DIR = join(resolveRuntimePaths().memoryDir, 'STATE', 'Evals-Results');
 
 /**
  * Ensure directories exist

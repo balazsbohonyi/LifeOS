@@ -17,8 +17,8 @@ Running the **CreateSkill** workflow in the **CreateSkill** skill to create new 
 
 **REQUIRED FIRST:**
 
-1. Read the skill system documentation: `~/.claude/LIFEOS/DOCUMENTATION/Skills/SkillSystem.md`
-2. Read a canonical example skill — pick any existing public skill in `~/.claude/skills/` (e.g. `Research/SKILL.md`, `Daemon/SKILL.md`) and study its frontmatter, voice notification, workflow routing, and examples sections.
+1. Read the skill system documentation: `$LIFEOS_DIR/DOCUMENTATION/Skills/SkillSystem.md`
+2. Read a canonical example skill — pick any existing public skill in `$SKILLS_DIR/` (e.g. `Research/SKILL.md`, `Daemon/SKILL.md`) and study its frontmatter, voice notification, workflow routing, and examples sections.
 
 ## Step 2: Understand the Request
 
@@ -72,14 +72,14 @@ Before building, apply the bitter lesson test: **"Would a smarter model make thi
 ## Step 4: Create the Skill Directory
 
 ```bash
-mkdir -p ~/.claude/skills/[SkillName]/Workflows
-mkdir -p ~/.claude/skills/[SkillName]/Tools
+mkdir -p $SKILLS_DIR/[SkillName]/Workflows
+mkdir -p $SKILLS_DIR/[SkillName]/Tools
 ```
 
 **Example:**
 ```bash
-mkdir -p ~/.claude/skills/_MYSKILL/Workflows
-mkdir -p ~/.claude/skills/_MYSKILL/Tools
+mkdir -p $SKILLS_DIR/_MYSKILL/Workflows
+mkdir -p $SKILLS_DIR/_MYSKILL/Tools
 ```
 
 ## Step 5: Create SKILL.md
@@ -114,7 +114,7 @@ description: [What it does]. USE WHEN [intent triggers using OR]. NOT FOR [confu
    Running **WorkflowName** in **SkillName**...
    ```
 
-**Full documentation:** `~/.claude/LIFEOS/DOCUMENTATION/Notifications/NotificationSystem.md`
+**Full documentation:** `$LIFEOS_DIR/DOCUMENTATION/Notifications/NotificationSystem.md`
 
 ## Workflow Routing
 
@@ -172,7 +172,7 @@ This is template-level — new skills include it by default. Retrofit of existin
 
 ## Step 5b: Public Release Readiness (MANDATORY)
 
-**Every skill in `~/.claude/skills/` ships with the LifeOS public release.** Write generic from the start — do not rely on a scrub at release-time.
+**Every skill in `$SKILLS_DIR/` ships with the LifeOS public release.** Write generic from the start — do not rely on a scrub at release-time.
 
 ### Required
 
@@ -182,13 +182,13 @@ This is template-level — new skills include it by default. Retrofit of existin
 
 ### Where Personal Context Belongs
 
-User-specific preferences, project names, domain lists, and war stories go in `~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/<SkillName>/` — the skill body loads these at runtime via the Customization block. This holds for **every** skill, public and private (2026-07-23 separation directive): a private `_ALLCAPS` skill's body is publish-clean code, its sensitive data lives under `LIFEOS/USER/`.
+User-specific preferences, project names, domain lists, and war stories go in `$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/<SkillName>/` — the skill body loads these at runtime via the Customization block. This holds for **every** skill, public and private (2026-07-23 separation directive): a private `_ALLCAPS` skill's body is publish-clean code, its sensitive data lives under `LIFEOS/USER/`.
 
 ### Pre-Flight Gate
 
 Before finalizing, run the deterministic hygiene gate — never a hand-rolled grep (a hardcoded pattern list rots and misses most of the deny-list):
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/SkillHygieneGate.ts --skill <SkillName>
+bun $LIFEOS_DIR/TOOLS/SkillHygieneGate.ts --skill <SkillName>
 ```
 
 Exit 0 = ready. Any violation = move the data to `LIFEOS/USER/CUSTOMIZATIONS/SKILLS/<SkillName>/` (or its canonical USER home) and reference it by path. The gate reads the canonical `LIFEOS/USER/SECURITY/DENY_LIST.txt`, so it stays in lockstep with the release pipeline. The write-time SystemFileGuard also blocks any deny-listed token from landing in a skill body at edit time. For bare first-names the deny-list intentionally ignores (attribution contexts), also grep the skill for the principal's and partner's first names (from the identity files) and genericize any that aren't a public citation or a functional detection pattern.
@@ -198,7 +198,7 @@ Exit 0 = ready. Any violation = move the data to `LIFEOS/USER/CUSTOMIZATIONS/SKI
 For each workflow in the routing section:
 
 ```bash
-touch ~/.claude/skills/[SkillName]/Workflows/[WorkflowName].md
+touch $SKILLS_DIR/[SkillName]/Workflows/[WorkflowName].md
 ```
 
 ### Workflow-to-Tool Integration (REQUIRED for workflows with CLI tools)
@@ -240,23 +240,23 @@ bun ToolName.ts \
 - Workflows should expose this flexibility, not hardcode single patterns
 - Users speak naturally; workflows translate to precise CLI
 
-**Reference:** `~/.claude/LIFEOS/DOCUMENTATION/Tools/CliFirstArchitecture.md` (Workflow-to-Tool Integration section)
+**Reference:** `$LIFEOS_DIR/DOCUMENTATION/Tools/CliFirstArchitecture.md` (Workflow-to-Tool Integration section)
 
 **Examples (TitleCase):**
 ```bash
-touch ~/.claude/skills/MyDaemon/Workflows/UpdateDaemonInfo.md
-touch ~/.claude/skills/MyDaemon/Workflows/UpdatePublicRepo.md
-touch ~/.claude/skills/MyBlog/Workflows/Create.md
-touch ~/.claude/skills/MyBlog/Workflows/Publish.md
+touch $SKILLS_DIR/MyDaemon/Workflows/UpdateDaemonInfo.md
+touch $SKILLS_DIR/MyDaemon/Workflows/UpdatePublicRepo.md
+touch $SKILLS_DIR/MyBlog/Workflows/Create.md
+touch $SKILLS_DIR/MyBlog/Workflows/Publish.md
 ```
 
 ## Step 7: Verify TitleCase
 
 Run this check:
 ```bash
-ls ~/.claude/skills/[SkillName]/
-ls ~/.claude/skills/[SkillName]/Workflows/
-ls ~/.claude/skills/[SkillName]/Tools/
+ls $SKILLS_DIR/[SkillName]/
+ls $SKILLS_DIR/[SkillName]/Workflows/
+ls $SKILLS_DIR/[SkillName]/Tools/
 ```
 
 Verify ALL files use TitleCase:

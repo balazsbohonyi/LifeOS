@@ -215,8 +215,8 @@ Evals implements the Science Protocol for prompt engineering. Don't reinvent eva
 ```bash
 # Run prompt comparison via the Evals skill: one suite per prompt version,
 # then compare the persisted results. See Evals/Workflows/ComparePrompts.md.
-bun run ~/.claude/skills/Evals/Tools/EvalRunner.ts -s <use-case>-baseline
-bun run ~/.claude/skills/Evals/Tools/EvalRunner.ts -s <use-case>-variant-1
+bun run $SKILLS_DIR/Evals/Tools/EvalRunner.ts -s <use-case>-baseline
+bun run $SKILLS_DIR/Evals/Tools/EvalRunner.ts -s <use-case>-variant-1
 ```
 
 ### Feature Experiments

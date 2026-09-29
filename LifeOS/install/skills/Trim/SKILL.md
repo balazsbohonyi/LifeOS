@@ -4,6 +4,11 @@ version: 1.0.4
 description: "Reduces an always-on LifeOS context file that has grown too big via a human-gated pass — deterministic GC of stale entries first, then semantic merges and relocations — never dropping a directive and committing every change reversibly. USE WHEN /trim, trim the context, trim OPERATIONAL_RULES, this file is too big, reduce a doctrine file, prune an always-loaded file, fold the proposal inbox, shrink CLAUDE.md or DA_IDENTITY. NOT FOR general code refactoring, trimming video or audio media (use AudioEditor for audio files), or removing AI writing patterns from prose."
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 # Trim
 
 Shrink an always-on context file that has gotten too big. `/trim <file>` walks the reduction, safest cuts first, never dropping a rule.
@@ -47,5 +52,5 @@ Shrink an always-on context file that has gotten too big. `/trim <file>` walks t
 After completing the workflow, append a single JSONL entry:
 
 ```bash
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Trim","workflow":"Trim","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> ~/.claude/LIFEOS/MEMORY/SKILLS/execution.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Trim","workflow":"Trim","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> $LIFEOS_DIR/MEMORY/SKILLS/execution.jsonl
 ```

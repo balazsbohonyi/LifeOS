@@ -27,7 +27,7 @@ Running the **RunEval** workflow in the **Evals** skill to execute evaluation...
 
 ```bash
 # Check use case exists
-ls ~/.claude/skills/Evals/UseCases/<use-case>/config.yaml
+ls "$SKILLS_DIR/Evals/UseCases/<use-case>/config.yaml"
 ```
 
 If missing, redirect to `CreateUseCase.md` workflow.
@@ -36,16 +36,16 @@ If missing, redirect to `CreateUseCase.md` workflow.
 
 ```bash
 # Run an eval suite via EvalRunner (the canonical entry point)
-bun run ~/.claude/skills/Evals/Tools/EvalRunner.ts -s <use-case>
+bun run "$SKILLS_DIR/Evals/Tools/EvalRunner.ts" -s <use-case>
 
 # Override the trial count for pass^k / pass@k:
-bun run ~/.claude/skills/Evals/Tools/EvalRunner.ts -s <use-case> -t 5
+bun run "$SKILLS_DIR/Evals/Tools/EvalRunner.ts" -s <use-case> -t 5
 
 # Machine-readable output:
-bun run ~/.claude/skills/Evals/Tools/EvalRunner.ts -s <use-case> --json
+bun run "$SKILLS_DIR/Evals/Tools/EvalRunner.ts" -s <use-case> --json
 
 # Saturation status is a separate SuiteManager command:
-bun run ~/.claude/skills/Evals/Tools/SuiteManager.ts check-saturation <use-case>
+bun run "$SKILLS_DIR/Evals/Tools/SuiteManager.ts" check-saturation <use-case>
 ```
 
 ### Step 3: Collect Results

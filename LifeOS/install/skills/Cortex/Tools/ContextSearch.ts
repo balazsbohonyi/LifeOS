@@ -2,20 +2,22 @@
 /// <reference types="bun-types" />
 declare const Bun: any;
 import { readFileSync, statSync, existsSync, readdirSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, resolve, sep } from "node:path";
 import { homedir } from "node:os";
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths";
 
-const HOME = homedir();
-const LIFEOS_DIR = join(HOME, ".claude");
-const STATE_DIR = join(LIFEOS_DIR, "LIFEOS", "MEMORY", "STATE");
-const WORK_DIR = join(LIFEOS_DIR, "LIFEOS", "MEMORY", "WORK");
+const RUNTIME_PATHS = resolveRuntimePaths();
+const HOME = RUNTIME_PATHS.home || homedir();
+const STATE_DIR = join(RUNTIME_PATHS.memoryDir, "STATE");
+const WORK_DIR = join(RUNTIME_PATHS.memoryDir, "WORK");
+const CLAUDE_CONFIG_ROOT = process.env.CLAUDE_CONFIG_DIR || join(HOME, ".claude");
 // Claude Code writes one transcript dir per working directory under
 // ~/.claude/projects/ (lowercase on disk — the old "Projects" spelling only
 // worked on case-insensitive macOS), named by the cwd with "/" and "." mapped
 // to "-". Search ALL of them: pinning to the ~/.claude slug alone made every
 // session run inside a code repo unrecallable (public issues #1494 + #1498,
 // @christauff / @simeonzickert).
-const PROJECTS_ROOT = join(LIFEOS_DIR, "projects");
+const PROJECTS_ROOT = join(CLAUDE_CONFIG_ROOT, "projects");
 const WORK_JSON = join(STATE_DIR, "work.json");
 const NAMES_JSON = join(STATE_DIR, "session-names.json");
 
@@ -433,7 +435,7 @@ async function searchProjectIsas(tokens: string[], since: Date | null, until: Da
   if (tokens.length === 0) return [];
   const candidates = new Set<string>();
   for (const cwd of discoveredProjectCwds()) {
-    if (cwd === LIFEOS_DIR) continue; // task ISAs under ~/.claude are covered by the WORK_DIR sources
+    if (cwd === RUNTIME_PATHS.configRoot) continue; // active-runtime task ISAs are covered by WORK_DIR sources
     const isa = join(cwd, "ISA.md");
     if (existsSync(isa)) candidates.add(isa);
   }
@@ -479,7 +481,8 @@ async function searchProjectIsas(tokens: string[], since: Date | null, until: Da
 async function searchJsonl(tokens: string[], since: Date | null, until: Date | null = null): Promise<Result[]> {
   if (tokens.length === 0 || !existsSync(PROJECTS_ROOT)) return [];
   const realDir = PROJECTS_ROOT;
-  if (!realDir.startsWith(join(HOME, ".claude", "projects"))) return [];
+  const projectsRoot = resolve(PROJECTS_ROOT);
+  if (realDir !== projectsRoot && !realDir.startsWith(projectsRoot + sep)) return [];
   const pattern = tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
   const out = await ripgrep(pattern, realDir, ["--glob", "*.jsonl", "-c"]);
   const byFile = new Map<string, { hits: number; path: string }>();

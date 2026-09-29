@@ -16,7 +16,7 @@ version: 1.2.7
 
 Through LifeOS v4 and v5, the live LifeOS tree and the public release artifact diverged because there was no enforced architectural separation between system code (intended to ship) and user data (must never ship). Defenses were exclusively build-time: a fourteen-gate scrubber (since grown to eighteen), a deny-list pattern grep, and a containment-zone path inventory. The runtime guard hook was removed in the 2026-05-06 security simplification, leaving no write-time enforcement at all. Drift accumulated between releases; every release required a re-sanitization sweep; the community ran a different artifact than the maintainer.
 
-This document declares the canonical boundary. Every file in `~/.claude/` falls into exactly one of four zones. The boundary is enforced at three layers: at write time by a runtime hook, at PR time by GitHub Actions, at release time by the existing build-time gates as a backstop.
+This document declares the canonical boundary. Every file in the active harness config tree falls into exactly one of four zones. Claude Code examples retain their `~/.claude/` spelling; Codex uses its active config root, normally `~/.codex/`. The boundary is enforced at three layers: at write time by a runtime hook, at PR time by GitHub Actions, at release time by the existing build-time gates as a backstop.
 
 ## The four zones
 
@@ -48,13 +48,15 @@ Public-by-construction code, documentation, and templates that ship in every Lif
 
 Private, user-owned data that ships in the user's own private repo and is mounted into the LifeOS tree via symlink or git submodule. USER files may contain anything — they are never inspected by the public release pipeline because they live outside the system tree.
 
-**Physical mount (post-Phase-G, 2026-05-22):** `~/.claude/LIFEOS/USER/` is a symlink to `~/.config/LIFEOS/USER/` (XDG-style data location). The actual git working tree for the user's private USER-data repo lives at `~/.config/LIFEOS/USER/` — the symlink at `~/.claude/LIFEOS/USER/` exists only so Claude Code's `@`-import resolver (which evaluates paths relative to `~/.claude/`) can reach identity / TELOS / config files at session start. Boundary semantics are unchanged: the "USER zone" still refers to anything under `~/.claude/LIFEOS/USER/**` logically; the only difference is that the bytes live at the XDG path on disk.
+**Physical mount (post-Phase-G, 2026-05-22):** `<active-config-root>/LIFEOS/USER/` is a link to `~/.config/LIFEOS/USER/` (XDG-style data location). The private USER-data repo lives at `~/.config/LIFEOS/USER/`; Claude Code's `~/.claude/LIFEOS/USER/` and Codex's `~/.codex/LIFEOS/USER/` are runtime-facing links to that store.
+
+**MEMORY mount:** `<active-config-root>/LIFEOS/MEMORY/` links to `~/.config/LIFEOS/USER/MEMORY/`. Windows Codex uses a directory junction at `~/.codex/LIFEOS/MEMORY/`; platforms that use symlinks retain their directory-symlink behavior. Setup previews both an existing runtime MEMORY directory and a legacy `~/.claude/LIFEOS/MEMORY/` archive. Applying requires explicit approval, copies only missing files, reports differing-content conflicts without overwriting, retains the runtime source under a recoverable backup name, and leaves the legacy archive in place. A broken or incorrectly targeted link is a write blocker; runtime writers must never fall back to a different harness tree.
 
 | Path | Status |
 |------|--------|
 | `~/.claude/.env`, `.env.*` | USER (secrets) |
-| `~/.claude/LIFEOS/USER/**` (symlink → `~/.config/LIFEOS/USER/**`) | USER (identity, TELOS, projects, integrations, contacts, finances, health, business, customizations) |
-| `~/.claude/LIFEOS/MEMORY/**` (symlink → `~/.config/LIFEOS/USER/MEMORY/**`, post-Phase-G.2, 2026-05-23) | USER (work history, knowledge graph, learning signals, observability logs, research, reflections, relationships). Durable subset (KNOWLEDGE, WORK/<slug>/ISA.md, RELATIONSHIP, WISDOM, PLANS, RESEARCH, STATE/work.json, BOOKMARKS, REFERENCE, SKILLS, PROJECT, TEAMS, SYSTEMUPDATES, VERIFICATION) is git-tracked in the user's private USER-data repo; ephemeral subset (OBSERVABILITY JSONLs, _BROWSER_STATE, LEARNING signals, SECURITY artifacts, VOICE event log, STATE caches, per-skill runtime state, PULSE_DATA, SCRATCHPAD, RAW, AUTO, CALLS, INBOX, ARCHIVE, DATA, WORK/<slug>/* intermediates) gitignored from the private repo, local-only. |
+| `<active-config-root>/LIFEOS/USER/**` (link → `~/.config/LIFEOS/USER/**`) | USER (identity, TELOS, projects, integrations, contacts, finances, health, business, customizations) |
+| `<active-config-root>/LIFEOS/MEMORY/**` (link or Windows junction → `~/.config/LIFEOS/USER/MEMORY/**`) | USER (work history, knowledge graph, learning signals, observability logs, research, reflections, relationships). Durable subset (KNOWLEDGE, WORK/<slug>/ISA.md, RELATIONSHIP, WISDOM, PLANS, RESEARCH, STATE/work.json, BOOKMARKS, REFERENCE, SKILLS, PROJECT, TEAMS, SYSTEMUPDATES, VERIFICATION) is git-tracked in the user's private USER-data repo; ephemeral subset (OBSERVABILITY JSONLs, _BROWSER_STATE, LEARNING signals, SECURITY artifacts, VOICE event log, STATE caches, per-skill runtime state, PULSE_DATA, SCRATCHPAD, RAW, AUTO, CALLS, INBOX, ARCHIVE, DATA, WORK/<slug>/* intermediates) gitignored from the private repo, local-only. |
 | `~/.claude/LIFEOS/ARBOL/**` | USER (private cloud worker code) |
 | `~/.claude/LIFEOS/Backups/**` | USER (backup state) |
 | `~/.claude/skills/_<name>/**` (underscore-prefixed) | USER (private/proprietary skills) |

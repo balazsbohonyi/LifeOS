@@ -20,7 +20,7 @@ Running the **UpdateSkill** workflow in the **CreateSkill** skill to modify exis
 **REQUIRED FIRST:** Read the canonical structure:
 
 ```
-~/.claude/LIFEOS/SkillSystem.md
+$LIFEOS_DIR/SkillSystem.md
 ```
 
 ---
@@ -28,7 +28,7 @@ Running the **UpdateSkill** workflow in the **CreateSkill** skill to modify exis
 ## Step 2: Read the Current Skill
 
 ```bash
-~/.claude/skills/[SkillName]/SKILL.md
+$SKILLS_DIR/[SkillName]/SKILL.md
 ```
 
 Understand the current:
@@ -57,12 +57,12 @@ What needs to change?
 
 2. **Create the workflow file:**
 ```bash
-touch ~/.claude/skills/[SkillName]/Workflows/[WorkflowName].md
+touch $SKILLS_DIR/[SkillName]/Workflows/[WorkflowName].md
 ```
 
 Example:
 ```bash
-touch ~/.claude/skills/_MYSKILL/Workflows/UpdatePublicRepo.md
+touch $SKILLS_DIR/_MYSKILL/Workflows/UpdatePublicRepo.md
 ```
 
 3. **Add entry to `## Workflow Routing` section in SKILL.md:**
@@ -88,13 +88,13 @@ description: [What it does]. USE WHEN [updated intent triggers using OR]. [Capab
 
 1. **Create TitleCase tool file:**
 ```bash
-touch ~/.claude/skills/[SkillName]/Tools/ToolName.ts
-touch ~/.claude/skills/[SkillName]/Tools/ToolName.help.md
+touch $SKILLS_DIR/[SkillName]/Tools/ToolName.ts
+touch $SKILLS_DIR/[SkillName]/Tools/ToolName.help.md
 ```
 
 2. **Ensure Tools/ directory exists:**
 ```bash
-mkdir -p ~/.claude/skills/[SkillName]/Tools
+mkdir -p $SKILLS_DIR/[SkillName]/Tools
 ```
 
 ---
@@ -104,8 +104,8 @@ mkdir -p ~/.claude/skills/[SkillName]/Tools
 After making changes, verify naming:
 
 ```bash
-ls ~/.claude/skills/[SkillName]/Workflows/
-ls ~/.claude/skills/[SkillName]/Tools/
+ls $SKILLS_DIR/[SkillName]/Workflows/
+ls $SKILLS_DIR/[SkillName]/Tools/
 ```
 
 All files must use TitleCase:

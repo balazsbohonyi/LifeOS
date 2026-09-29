@@ -19,11 +19,18 @@
 
 set -euo pipefail
 
+# Resolve this installed skill's active LifeOS user tree without assuming a
+# Claude-specific config root.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONFIG_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
+LIFEOS_DIR="$CONFIG_ROOT/LIFEOS"
+
 # Source per-machine USER customizations so INTERCEPTOR_TEST_CHROME_PROFILE
 # resolves from the single canonical home (preferences.env), not a guessed
 # default. The preflight sources this too; this script must not rely on the
 # preflight having run first.
-USER_PREFS="${HOME}/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Interceptor/preferences.env"
+USER_PREFS="$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Interceptor/preferences.env"
 if [ -f "$USER_PREFS" ]; then
     # shellcheck disable=SC1090
     . "$USER_PREFS"
@@ -43,7 +50,7 @@ if [ -z "$CHROME_PROFILE" ]; then
 LaunchTestProfile.sh: FAIL — no test profile configured.
 
   INTERCEPTOR_TEST_CHROME_PROFILE is unset/empty. Set it in
-    ~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Interceptor/preferences.env
+    $USER_PREFS
   to the dedicated Interceptor test profile's on-disk directory name (e.g.
   "Profile N" — map directory -> friendly name via
   ~/Library/Application Support/Google/Chrome/Local State, profile.info_cache).

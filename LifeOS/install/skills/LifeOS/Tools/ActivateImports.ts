@@ -13,7 +13,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { activateImports, detectDevTree } from "./InstallEngine";
+import { activateImports, detectDevTree, resolveSetupConfigRoot } from "./InstallEngine";
 
 function main(): void {
   const a = process.argv.slice(2);
@@ -22,7 +22,7 @@ function main(): void {
     return i >= 0 && a[i + 1] && !a[i + 1].startsWith("--") ? a[i + 1] : undefined;
   };
   const home = process.env.HOME || homedir(); // public issue #1729, @umair-a11y
-  const configRoot = get("--config-root") || process.env.CLAUDE_CONFIG_DIR || join(home, ".claude");
+  const configRoot = get("--config-root") || resolveSetupConfigRoot(home);
   const apply = a.includes("--apply");
   const allowDev = a.includes("--allow-dev");
 

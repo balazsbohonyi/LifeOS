@@ -6,10 +6,15 @@ context: fork
 background: false
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 ## Customization
 
 Before executing, check for user customizations at:
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Ideate/`
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Ideate/`
 
 # Ideate — The Cognitive Progress Engine
 
@@ -143,7 +148,7 @@ Loop Controller decides actual cycle count adaptively, not a fixed count.
 
 ## State Persistence
 
-Each run persists to `~/.claude/LIFEOS/MEMORY/WORK/{slug}/ideate/`:
+Each run persists to `$LIFEOS_DIR/MEMORY/WORK/{slug}/ideate/`:
 
 ```
 ideate/
@@ -279,5 +284,5 @@ When the Algorithm runs an ideation cycle it loads this skill and routes to `Wor
 After completing any workflow, append a single JSONL entry:
 
 ```bash
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Ideate","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> ~/.claude/LIFEOS/MEMORY/SKILLS/execution.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Ideate","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> $LIFEOS_DIR/MEMORY/SKILLS/execution.jsonl
 ```

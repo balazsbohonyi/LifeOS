@@ -4,10 +4,15 @@ version: 1.0.10
 description: "Audits any AI instruction set for over-prompting using the core test — would a smarter model make this rule unnecessary? Applies Five Questions to every rule (Claude already does this? Contradiction? Redundant? One-off fix? Vague?) then classifies as CUT/RESOLVE/MERGE/EVALUATE/SHARPEN/MOVE/KEEP. Workflows: Audit (full system, token savings), QuickCheck (single file). Principle: less scaffolding = better output. USE WHEN BPE, bitter pill, audit setup, over-prompting, trim instructions, dead weight, simplify setup, clean up CLAUDE.md. NOT FOR attacking logical flaws in ideas (use RedTeam)."
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 ## Customization
 
 **Before executing, check for user customizations at:**
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/BitterPillEngineering/`
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/BitterPillEngineering/`
 
 If this directory exists, load and apply any PREFERENCES.md, configurations, or resources found there. These override default behavior. If the directory does not exist, proceed with skill defaults.
 
@@ -82,7 +87,7 @@ User: "I trimmed my rules, check if anything's still redundant"
 - Rules that seem redundant with defaults may have been added because Claude was inconsistent about following the default. Check failure history before cutting.
 - "One-off fix" rules sometimes prevent recurring failures. Check if the failure pattern is truly gone before removing.
 - The `loadAtStartup` list in settings.json and `postCompactRestore.fullFiles` must stay in sync — if you remove a file from one, check the other.
-- **Deterministic drift detection exists:** `bun ~/.claude/LIFEOS/TOOLS/SkillDriftLint.ts --dir skills/ [--strict] [--top N]` (ported from @rpriven, public issue #1523). Advisory-only V1/V2 pattern scan — use it to FIND candidates mechanically, then judge each against the four keep-classes with this skill's questions. Drift grows back after every cut; the linter is the continuous check, this skill is the judgment.
+- **Deterministic drift detection exists:** `bun $LIFEOS_DIR/TOOLS/SkillDriftLint.ts --dir skills/ [--strict] [--top N]` (ported from @rpriven, public issue #1523). Advisory-only V1/V2 pattern scan — use it to FIND candidates mechanically, then judge each against the four keep-classes with this skill's questions. Drift grows back after every cut; the linter is the continuous check, this skill is the judgment.
 
 ## The Five Questions
 
@@ -156,5 +161,5 @@ Exception — four keep-classes are legitimate HOW, never cut them: **safety-gat
 After completing any workflow, append a single JSONL entry:
 
 ```bash
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"BitterPillEngineering","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> ~/.claude/LIFEOS/MEMORY/SKILLS/execution.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"BitterPillEngineering","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> $LIFEOS_DIR/MEMORY/SKILLS/execution.jsonl
 ```

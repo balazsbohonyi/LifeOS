@@ -4,6 +4,11 @@ version: 1.0.1
 description: Read, create, and edit tldraw .tldr canvas files deterministically — sketch hand-drawn-register diagrams (boxes, arrows, sticky notes, frames, text) directly into a canvas file the user opens in any tldraw surface, and read a rough canvas back as structured data to organize it. USE WHEN tldraw, .tldr file, whiteboard, canvas, sketch a diagram, hand-drawn diagram, draw this on a canvas, put this on the whiteboard, structure my canvas, organize my whiteboard, read my canvas, cluster my sticky notes. NOT FOR polished static images, infographics, or mermaid diagrams (use Art), web UI design (use Webdesign), programmatic video (use Remotion).
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 # Tldraw
 
 Deterministic read/write for tldraw canvases. The `.tldr` format is plain JSON (`{tldrawFileFormatVersion: 1, schema, records}`); `Tools/Tldr.ts` writes records that pass tldraw's own validator, so generated files open cleanly in the tldraw web editor, the VS Code tldraw extension, or the desktop app. Two directions: model → canvas (sketch diagrams) and canvas → model (read and structure a human's rough thinking).
@@ -11,7 +16,7 @@ Deterministic read/write for tldraw canvases. The `.tldr` format is plain JSON (
 ## Customization
 
 **Before executing, check for user customizations at:**
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Tldraw/`
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Tldraw/`
 
 If this directory exists, load and apply any PREFERENCES.md found there (default canvas directory, preferred colors/register, default open surface). If not, proceed with defaults.
 
@@ -41,7 +46,7 @@ If this directory exists, load and apply any PREFERENCES.md found there (default
 
 ## Quick Reference
 
-- Tool: `bun ~/.claude/skills/Tldraw/Tools/Tldr.ts <create|inspect|add|remove|move|settext|validate> <file.tldr> [flags]`
+- Tool: `bun $SKILLS_DIR/Tldraw/Tools/Tldr.ts <create|inspect|add|remove|move|settext|validate> <file.tldr> [flags]`
 - Record shapes, spec format, coordinate conventions: `References/TldrFormat.md`
 - Vendored schema (tldraw 5.2.5): `References/SchemaSnapshot.json`
 
@@ -85,5 +90,5 @@ User: "I dumped ideas on my canvas — structure them"
 After completing any workflow, append a single JSONL entry:
 
 ```bash
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Tldraw","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> ~/.claude/LIFEOS/MEMORY/SKILLS/execution.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Tldraw","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> $LIFEOS_DIR/MEMORY/SKILLS/execution.jsonl
 ```

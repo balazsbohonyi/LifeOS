@@ -22,13 +22,11 @@
 
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
-import { homedir } from "node:os"
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts"
 
 import type { Digest, Item, SectionKey } from "./Types.ts"
 
-const CONFIG_PATH = join(
-  homedir(), ".claude", "LIFEOS", "USER", "CUSTOMIZATIONS", "SKILLS", "LocalIntelligence", "sources.json"
-)
+const CONFIG_PATH = join(resolveRuntimePaths().userDir, "CUSTOMIZATIONS", "SKILLS", "LocalIntelligence", "sources.json")
 
 const SECTION_KEYS: SectionKey[] = [
   "construction", "crime", "business", "officials",

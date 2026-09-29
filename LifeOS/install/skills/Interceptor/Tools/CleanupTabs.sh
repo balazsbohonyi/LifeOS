@@ -22,13 +22,14 @@
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
 # Preferences live in USER customizations, same as every sibling tool (Capture.sh,
 # PreflightIsolation.sh, EnsureTestProfile.sh, LaunchTestProfile.sh). Reading the
 # skill-local copy first meant this script could see a different pinned context
 # than the gate that authorizes it — and on a stock install, where the skill ships
 # only preferences.env.example, no context at all (exit 8 on every run).
 # public issue #1802, @catchingknives
-PREFS="${HOME}/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Interceptor/preferences.env"
+PREFS="$CONFIG_ROOT/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Interceptor/preferences.env"
 [[ -f "$PREFS" ]] || PREFS="$SKILL_DIR/preferences.env"
 
 DRY_RUN=0

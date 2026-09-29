@@ -54,6 +54,57 @@ describe("resolveRuntimePaths", () => {
     expect(paths.lifeosDir).toBe(join(home, ".claude", "LIFEOS"));
   });
 
+  test("does not treat the repository install payload as the active runtime", () => {
+    const home = normalize("C:/Users/Source Runner");
+    const paths = resolveRuntimePaths({
+      env: {},
+      home,
+      toolDir: normalize("D:/checkout/LifeOS/install/LIFEOS/TOOLS"),
+    });
+    expect(paths.configRoot).toBe(join(home, ".claude"));
+    expect(paths.lifeosDir).toBe(join(home, ".claude", "LIFEOS"));
+  });
+
+  test("uses USERPROFILE when HOME is present but empty", () => {
+    const home = normalize("C:/Users/Windows User");
+    const paths = resolveRuntimePaths({
+      env: { HOME: "", USERPROFILE: home },
+      toolDir: normalize("D:/source/tools"),
+    });
+    expect(paths.home).toBe(home);
+    expect(paths.configRoot).toBe(join(home, ".claude"));
+  });
+
+  test("active Codex markers override a stale Claude config and LIFEOS_DIR", () => {
+    const home = normalize("C:/Users/Codex User");
+    const codexRoot = join(home, ".codex");
+    const paths = resolveRuntimePaths({
+      env: {
+        HOME: home,
+        CODEX_THREAD_ID: "thread-1",
+        CLAUDE_CONFIG_DIR: join(home, ".claude"),
+        LIFEOS_DIR: join(home, ".claude", "LIFEOS"),
+      },
+      toolDir: normalize("D:/payload/LIFEOS/TOOLS"),
+    });
+
+    expect(paths.configRoot).toBe(codexRoot);
+    expect(paths.lifeosDir).toBe(join(codexRoot, "LIFEOS"));
+    expect(paths.memoryDir).toBe(join(codexRoot, "LIFEOS", "MEMORY"));
+  });
+
+  test("CODEX_HOME overrides a stale Claude config root", () => {
+    const home = normalize("C:/Users/Codex User");
+    const codexRoot = normalize("D:/Codex Profiles/Primary");
+    const paths = resolveRuntimePaths({
+      env: { HOME: home, CODEX_HOME: codexRoot, CLAUDE_CONFIG_DIR: join(home, ".claude") },
+      toolDir: normalize("D:/payload/LIFEOS/TOOLS"),
+    });
+
+    expect(paths.configRoot).toBe(codexRoot);
+    expect(paths.lifeosDir).toBe(join(codexRoot, "LIFEOS"));
+  });
+
   test("resolves relative overrides once and publishes only canonical absolute roots", () => {
     const home = normalize("C:/Users/Portable User");
     const paths = resolveRuntimePaths({

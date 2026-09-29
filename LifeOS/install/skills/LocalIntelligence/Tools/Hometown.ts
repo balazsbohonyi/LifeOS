@@ -7,7 +7,7 @@
  * there are no hardcoded city strings anywhere else.
  *
  * Identity file location is configurable via env var `LIFEOS_PRINCIPAL_IDENTITY`,
- * defaulting to `~/.claude/LIFEOS/USER/PRINCIPAL/PRINCIPAL_IDENTITY.md`.
+ * defaulting to the active runtime's `LIFEOS/USER/PRINCIPAL/PRINCIPAL_IDENTITY.md`.
  *
  * Expected line shape (Quick Reference bullet):
  *   - **Hometown:** <City>, <ST> (ZIP <zip>, <County> County)
@@ -18,7 +18,7 @@
 
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
-import { homedir } from "node:os"
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts"
 
 export interface Hometown {
   city: string
@@ -42,14 +42,7 @@ export class NoHometownError extends Error {
   }
 }
 
-const IDENTITY_DEFAULT = join(
-  homedir(),
-  ".claude",
-  "LIFEOS",
-  "USER",
-  "PRINCIPAL",
-  "PRINCIPAL_IDENTITY.md"
-)
+const IDENTITY_DEFAULT = join(resolveRuntimePaths().userDir, "PRINCIPAL", "PRINCIPAL_IDENTITY.md")
 
 /** Strict regex for the Quick Reference bullet line. */
 const HOMETOWN_RE =

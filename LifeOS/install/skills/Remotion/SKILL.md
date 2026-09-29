@@ -39,8 +39,10 @@ Define a composition as React, animate with `useCurrentFrame()`, render with `bu
 
 ## Customization
 
+Resolve `$LIFEOS_DIR` and `$SKILLS_DIR` from the active runtime before using a path below. During Codex, prefer `CODEX_HOME` or Codex session markers; do not use a stale Claude config value.
+
 **Before executing, check for user customizations at:**
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Remotion/`
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Remotion/` (resolve `LIFEOS_DIR` from the active runtime; on Codex use `CODEX_HOME` or Codex markers before considering Claude config values)
 
 ## Workflow Routing
 
@@ -104,7 +106,7 @@ User: "create a video showing how the Algorithm works"
 After completing any workflow, append a single JSONL entry:
 
 ```bash
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Remotion","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> ~/.claude/LIFEOS/MEMORY/SKILLS/execution.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Remotion","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> "$LIFEOS_DIR/MEMORY/SKILLS/execution.jsonl"
 ```
 
 Replace `WORKFLOW_USED` with the workflow executed, `8_WORD_SUMMARY` with a brief input description, and `SECONDS` with approximate wall-clock time. Log `status: "error"` if the workflow failed.

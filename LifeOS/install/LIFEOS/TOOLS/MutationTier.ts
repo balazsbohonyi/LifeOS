@@ -4,7 +4,7 @@
  *
  * LifeOS autonomic memory subsystem, F8.
  *
- * Classifies any absolute path under ~/.claude/ into one of four tiers that
+ * Classifies paths under the active LifeOS runtime into one of four tiers that
  * govern what the Memory Reviewer subprocess is allowed to do with it:
  *
  *   Tier A — fully autonomic. Reviewer Phase 1 may set-overwrite via MemoryWriter.
@@ -35,41 +35,42 @@
 
 // public issue #1747, @umair-a11y — isAbsolute()/sep instead of hardcoded "/"
 import { resolve as pathResolve, isAbsolute, sep } from "node:path";
-import { homedir } from "node:os";
-import { getPrincipalName } from "../../hooks/lib/identity";
+import { resolveRuntimePaths } from "./RuntimePaths";
 
 // ── Constants ──
 
-const CLAUDE_ROOT = pathResolve(homedir(), ".claude");
+const RUNTIME_PATHS = resolveRuntimePaths();
+const USER_DIR = RUNTIME_PATHS.userDir;
+const MEMORY_DIR = RUNTIME_PATHS.memoryDir;
 
 export type Tier = "A" | "B" | "C" | "D";
 
 /** Tier A: fully-autonomic memory hot-layer files. */
 const TIER_A_FILES: ReadonlySet<string> = new Set([
-  pathResolve(CLAUDE_ROOT, "LIFEOS/USER/PRINCIPAL/PRINCIPAL_MEMORY.md"),
-  pathResolve(CLAUDE_ROOT, "LIFEOS/USER/DIGITAL_ASSISTANT/DA_MEMORY.md"),
+  pathResolve(USER_DIR, "PRINCIPAL/PRINCIPAL_MEMORY.md"),
+  pathResolve(USER_DIR, "DIGITAL_ASSISTANT/DA_MEMORY.md"),
 ]);
 
 /** Tier B: append-with-audit files (exact-match paths). */
 const TIER_B_FILES: ReadonlySet<string> = new Set([
-  pathResolve(CLAUDE_ROOT, "LIFEOS/USER/PROJECTS.md"),
-  pathResolve(CLAUDE_ROOT, "LIFEOS/USER/CONTACTS.md"),
+  pathResolve(USER_DIR, "PROJECTS.md"),
+  pathResolve(USER_DIR, "CONTACTS.md"),
 ]);
 
 /** Tier B: append-with-audit prefixes (any file beneath these dirs is Tier B). */
 const TIER_B_PREFIXES: readonly string[] = [
-  pathResolve(CLAUDE_ROOT, "LIFEOS/MEMORY/KNOWLEDGE") + sep,
-  pathResolve(CLAUDE_ROOT, "LIFEOS/MEMORY/IDEAS") + sep,
+  pathResolve(MEMORY_DIR, "KNOWLEDGE") + sep,
+  pathResolve(MEMORY_DIR, "IDEAS") + sep,
 ];
 
 /** Tier C: propose-only identity-doctrine files (exact-match paths). */
 const TIER_C_FILES: ReadonlySet<string> = new Set([
-  pathResolve(CLAUDE_ROOT, "LIFEOS/USER/PRINCIPAL/PRINCIPAL_IDENTITY.md"),
-  pathResolve(CLAUDE_ROOT, "LIFEOS/USER/DIGITAL_ASSISTANT/DA_IDENTITY.md"),
-  pathResolve(CLAUDE_ROOT, "LIFEOS/USER/PRINCIPAL/WRITINGSTYLE.md"),
-  pathResolve(CLAUDE_ROOT, "LIFEOS/USER/DEFINITIONS.md"),
-  pathResolve(CLAUDE_ROOT, "LIFEOS/USER/CANONICAL_CONTENT.md"),
-  pathResolve(CLAUDE_ROOT, "LIFEOS/USER/PRINCIPAL/RESUME.md"),
+  pathResolve(USER_DIR, "PRINCIPAL/PRINCIPAL_IDENTITY.md"),
+  pathResolve(USER_DIR, "DIGITAL_ASSISTANT/DA_IDENTITY.md"),
+  pathResolve(USER_DIR, "PRINCIPAL/WRITINGSTYLE.md"),
+  pathResolve(USER_DIR, "DEFINITIONS.md"),
+  pathResolve(USER_DIR, "CANONICAL_CONTENT.md"),
+  pathResolve(USER_DIR, "PRINCIPAL/RESUME.md"),
 ]);
 
 // ── Public API ──
@@ -132,111 +133,111 @@ function smokeTest(): number {
   const cases: Case[] = [
     // Tier A — the two memory files
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/USER/PRINCIPAL/PRINCIPAL_MEMORY.md"),
+      path: pathResolve(USER_DIR, "PRINCIPAL/PRINCIPAL_MEMORY.md"),
       expected: "A",
       why: "PRINCIPAL_MEMORY.md is hot-layer autonomic",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/USER/DIGITAL_ASSISTANT/DA_MEMORY.md"),
+      path: pathResolve(USER_DIR, "DIGITAL_ASSISTANT/DA_MEMORY.md"),
       expected: "A",
       why: "DA_MEMORY.md is hot-layer autonomic",
     },
 
     // Tier B — exact-match
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/USER/PROJECTS.md"),
+      path: pathResolve(USER_DIR, "PROJECTS.md"),
       expected: "B",
       why: "PROJECTS.md is append-with-audit",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/USER/CONTACTS.md"),
+      path: pathResolve(USER_DIR, "CONTACTS.md"),
       expected: "B",
       why: "CONTACTS.md is append-with-audit",
     },
 
     // Tier B — KNOWLEDGE prefix
     {
-      path: pathResolve(CLAUDE_ROOT, `LIFEOS/MEMORY/KNOWLEDGE/People/${getPrincipalName()}.md`),
+      path: pathResolve(MEMORY_DIR, "KNOWLEDGE/People/test-person.md"),
       expected: "B",
       why: "KNOWLEDGE/People/* is append-with-audit",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/MEMORY/KNOWLEDGE/Ideas/some-idea.md"),
+      path: pathResolve(MEMORY_DIR, "KNOWLEDGE/Ideas/some-idea.md"),
       expected: "B",
       why: "KNOWLEDGE/Ideas/* is append-with-audit",
     },
 
     // Tier C — six identity-doctrine files
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/USER/PRINCIPAL/PRINCIPAL_IDENTITY.md"),
+      path: pathResolve(USER_DIR, "PRINCIPAL/PRINCIPAL_IDENTITY.md"),
       expected: "C",
       why: "PRINCIPAL_IDENTITY.md is propose-only",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/USER/DIGITAL_ASSISTANT/DA_IDENTITY.md"),
+      path: pathResolve(USER_DIR, "DIGITAL_ASSISTANT/DA_IDENTITY.md"),
       expected: "C",
       why: "DA_IDENTITY.md is propose-only",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/USER/PRINCIPAL/WRITINGSTYLE.md"),
+      path: pathResolve(USER_DIR, "PRINCIPAL/WRITINGSTYLE.md"),
       expected: "C",
       why: "WRITINGSTYLE.md is propose-only",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/USER/DEFINITIONS.md"),
+      path: pathResolve(USER_DIR, "DEFINITIONS.md"),
       expected: "C",
       why: "DEFINITIONS.md is propose-only",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/USER/CANONICAL_CONTENT.md"),
+      path: pathResolve(USER_DIR, "CANONICAL_CONTENT.md"),
       expected: "C",
       why: "CANONICAL_CONTENT.md is propose-only",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/USER/PRINCIPAL/RESUME.md"),
+      path: pathResolve(USER_DIR, "PRINCIPAL/RESUME.md"),
       expected: "C",
       why: "RESUME.md is propose-only",
     },
 
     // Tier D — default-deny for anything not on a higher list
     {
-      path: pathResolve(CLAUDE_ROOT, "settings.json"),
+      path: pathResolve(RUNTIME_PATHS.configRoot, "settings.json"),
       expected: "D",
       why: "settings.json is untouchable by reviewer",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, ".env"),
+      path: pathResolve(RUNTIME_PATHS.configRoot, ".env"),
       expected: "D",
       why: ".env is untouchable by reviewer",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "hooks/Safety.hook.ts"),
+      path: pathResolve(RUNTIME_PATHS.configRoot, "hooks/Safety.hook.ts"),
       expected: "D",
       why: "hooks/* is code, untouchable",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "CLAUDE.md"),
+      path: pathResolve(RUNTIME_PATHS.configRoot, "CLAUDE.md"),
       expected: "D",
       why: "CLAUDE.md is code-doctrine, untouchable",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/LIFEOS_SYSTEM_PROMPT.md"),
+      path: pathResolve(RUNTIME_PATHS.lifeosDir, "LIFEOS_SYSTEM_PROMPT.md"),
       expected: "D",
       why: "LIFEOS_SYSTEM_PROMPT.md is constitutional, untouchable",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/ALGORITHM/v6.9.0.md"),
+      path: pathResolve(RUNTIME_PATHS.lifeosDir, "ALGORITHM/v6.9.0.md"),
       expected: "D",
       why: "Algorithm/* is doctrine, untouchable",
     },
     {
-      path: pathResolve(CLAUDE_ROOT, "skills/ISA/SKILL.md"),
+      path: pathResolve(RUNTIME_PATHS.configRoot, "skills/ISA/SKILL.md"),
       expected: "D",
       why: "skills/* is doctrine, untouchable",
     },
     // ISC-105 — newly-added arbitrary file defaults to Tier D
     {
-      path: pathResolve(CLAUDE_ROOT, "LIFEOS/USER/some_brand_new_file_2026.md"),
+      path: pathResolve(USER_DIR, "some_brand_new_file_2026.md"),
       expected: "D",
       why: "ISC-105 anti: unknown file defaults to Tier D",
     },
@@ -255,7 +256,7 @@ function smokeTest(): number {
     const ok = got === c.expected;
     if (ok) {
       pass++;
-      console.log(`  ✓ ${c.expected}  ${c.path.replace(CLAUDE_ROOT, "~/.claude")}  — ${c.why}`);
+      console.log(`  ✓ ${c.expected}  ${c.path.replace(RUNTIME_PATHS.configRoot, "~")}  — ${c.why}`);
     } else {
       fail++;
       console.error(`  ✗ expected ${c.expected}, got ${got}  ${c.path}  — ${c.why}`);

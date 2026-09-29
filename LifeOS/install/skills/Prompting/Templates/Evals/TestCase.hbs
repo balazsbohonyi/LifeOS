@@ -134,10 +134,10 @@ To run these test cases:
 
 ```bash
 # Run every case in the suite
-bun run ~/.claude/skills/Evals/Tools/EvalRunner.ts -s {{test_suite.name}}
+bun run "$SKILLS_DIR/Evals/Tools/EvalRunner.ts" -s {{test_suite.name}}
 
 # Raise the trial count for pass^k / pass@k
-bun run ~/.claude/skills/Evals/Tools/EvalRunner.ts -s {{test_suite.name}} -t 5
+bun run "$SKILLS_DIR/Evals/Tools/EvalRunner.ts" -s {{test_suite.name}} -t 5
 ```
 
 The runner has no single-case flag — to isolate one case, put it in its own

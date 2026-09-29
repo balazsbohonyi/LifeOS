@@ -2,7 +2,7 @@
  * LifeOS Theme for Remotion
  *
  * Derived from Art skill preferences at:
- * ~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Art/PREFERENCES.md
+ * $LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Art/PREFERENCES.md
  *
  * Core aesthetic: Charcoal architectural sketch with purple accents
  * Visual feel: Monumental emotional spaces, gestural linework, cool washes

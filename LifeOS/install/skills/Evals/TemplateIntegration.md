@@ -3,7 +3,7 @@
 ## Available Templates
 
 ```
-~/.claude/Templates/Evals/
+$SKILLS_DIR/Evals/Templates/
 ├── Judge.hbs       # Configurable LLM-as-Judge prompts
 ├── Rubric.hbs      # Evaluation criteria definitions
 ├── TestCase.hbs    # Test case specifications
@@ -18,10 +18,10 @@
 Use the JUDGE template for custom evaluation:
 
 ```bash
-bun run ~/.claude/skills/Prompting/Tools/RenderTemplate.ts \
+bun run "$SKILLS_DIR/Prompting/Tools/RenderTemplate.ts" \
   -t Evals/Judge.hbs \
-  -d ~/.claude/skills/Evals/UseCases/<name>/judge-config.yaml \
-  -o ~/.claude/skills/Evals/UseCases/<name>/judge-prompt.md
+  -d "$SKILLS_DIR/Evals/UseCases/<name>/judge-config.yaml" \
+  -o "$SKILLS_DIR/Evals/UseCases/<name>/judge-prompt.md"
 ```
 
 ### Judge Config Example
@@ -55,10 +55,10 @@ output:
 Use the RUBRIC template for scoring criteria:
 
 ```bash
-bun run ~/.claude/skills/Prompting/Tools/RenderTemplate.ts \
+bun run "$SKILLS_DIR/Prompting/Tools/RenderTemplate.ts" \
   -t Evals/Rubric.hbs \
-  -d ~/.claude/skills/Evals/UseCases/<name>/rubric.yaml \
-  -o ~/.claude/skills/Evals/UseCases/<name>/rubric.md
+  -d "$SKILLS_DIR/Evals/UseCases/<name>/rubric.yaml" \
+  -o "$SKILLS_DIR/Evals/UseCases/<name>/rubric.md"
 ```
 
 ---

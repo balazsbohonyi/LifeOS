@@ -27,11 +27,11 @@ Discover, fill, submit, and verify a form on any page. Uses Interceptor's semant
 ### 0. Preflight Isolation Gate (MANDATORY first step)
 
 ```bash
-source ~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Interceptor/preferences.env
-bash ~/.claude/skills/Interceptor/Tools/PreflightIsolation.sh
+source $LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Interceptor/preferences.env
+bash $SKILLS_DIR/Interceptor/Tools/PreflightIsolation.sh
 ```
 
-Prefer `bash ~/.claude/skills/Interceptor/Tools/EnsureTestProfile.sh` — it runs the gate and auto-launches the test profile if it isn't open (exit 5/6), only proceeding after the pinned-UUID match passes. Non-zero exit → STOP and surface the message verbatim; do not fall back to the Default profile. `INTERCEPTOR_TEST_CONTEXT_ID` is the pinned isolated context; every browser verb below passes it. Form testing in the isolated profile keeps test submissions away from any real auth state in the operator's main session. Screenshots go through `Tools/Capture.sh`, never raw `interceptor screenshot`.
+Prefer `bash $SKILLS_DIR/Interceptor/Tools/EnsureTestProfile.sh` — it runs the gate and auto-launches the test profile if it isn't open (exit 5/6), only proceeding after the pinned-UUID match passes. Non-zero exit → STOP and surface the message verbatim; do not fall back to the Default profile. `INTERCEPTOR_TEST_CONTEXT_ID` is the pinned isolated context; every browser verb below passes it. Form testing in the isolated profile keeps test submissions away from any real auth state in the operator's main session. Screenshots go through `Tools/Capture.sh`, never raw `interceptor screenshot`.
 
 ### 1. Open the Page with the Form (in the isolated profile)
 
@@ -84,7 +84,7 @@ interceptor click "radio:Monthly Plan" --context "$INTERCEPTOR_TEST_CONTEXT_ID"
 Before submitting, verify the form looks correct:
 
 ```bash
-bash ~/.claude/skills/Interceptor/Tools/Capture.sh --current
+bash $SKILLS_DIR/Interceptor/Tools/Capture.sh --current
 ```
 
 Read the printed image path to confirm fields are populated correctly and no validation errors are showing. `Capture.sh --current` shoots the already-open page in the pinned context.
@@ -115,7 +115,7 @@ interceptor read --text-only --context "$INTERCEPTOR_TEST_CONTEXT_ID"
 interceptor net log --json --context "$INTERCEPTOR_TEST_CONTEXT_ID"
 
 # Capture the result page
-bash ~/.claude/skills/Interceptor/Tools/Capture.sh --current
+bash $SKILLS_DIR/Interceptor/Tools/Capture.sh --current
 ```
 
 Look for:
@@ -140,7 +140,7 @@ interceptor read --text-only --context "$INTERCEPTOR_TEST_CONTEXT_ID"
 
 # Very long input
 interceptor type "textbox:Name" "A very long name that might break layout assumptions in the form" --context "$INTERCEPTOR_TEST_CONTEXT_ID"
-bash ~/.claude/skills/Interceptor/Tools/Capture.sh --current
+bash $SKILLS_DIR/Interceptor/Tools/Capture.sh --current
 ```
 
 ## Notes
@@ -149,5 +149,5 @@ bash ~/.claude/skills/Interceptor/Tools/Capture.sh --current
 - `interceptor type` clears the field before typing. Use `interceptor type <ref> "text" --append` to add to existing content.
 - For dropdowns/selects, use `interceptor select <ref> "value"` instead of click-based selection.
 - Network log captures the actual API request triggered by form submission — useful for verifying the correct endpoint and payload shape.
-- After all form scenarios are done and evidence is captured, run `bash ~/.claude/skills/Interceptor/Tools/CleanupTabs.sh` to close the tabs the test opened in the test profile.
+- After all form scenarios are done and evidence is captured, run `bash $SKILLS_DIR/Interceptor/Tools/CleanupTabs.sh` to close the tabs the test opened in the test profile.
 - For password fields, use `interceptor act <ref> "value" --trusted` for OS-level HID-sourced input (formerly `--os`, now deprecated alias). Bypasses autocomplete detection on sites that check `isTrusted` against HID source state.

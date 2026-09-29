@@ -4,11 +4,16 @@ version: 1.0.5
 description: "Drives cmux as an agent cockpit to boot, race, and monitor visible agent teams. Mac-only. USE WHEN cmux, agent cockpit, boot an agent team, orchestrate agents, three-tier orchestration, agent race, needle-in-haystack hotfix, agent fleet, 2x2 fleet, watch/monitor my agents, scale compute to scale impact, send a prompt to a running agent, multiplexer, terminal cockpit, orchestrator lead worker. NOT FOR one-shot in-harness subagents with no terminal to watch (use Agent/Workflow), the Pulse dashboard itself (cmux feeds it, use Pulse), browser deploy-verification (use Interceptor), or Linux/Windows (cmux is Mac-only — use tmux)."
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 # CMUX
 
 Make cmux the cockpit for every agent — LifeOS's own and your hands-on coding teams. One command boots a named, color-identified workspace of agents you can *see, prompt, and steer*, because an agent you can't see is an agent you can't improve. {{DA_NAME}} drives them through cmux's real send/read/open-close loop; a poll-based monitor speaks up when they finish.
 
-Everything routes through one wrapper: `bun ~/.claude/skills/CMUX/Tools/cmux.ts <subcommand>`. It auto-launches the cmux app — but cmux's socket is **default-deny**, so driving it needs auth (see the first Gotcha).
+Everything routes through one wrapper: `bun $SKILLS_DIR/CMUX/Tools/cmux.ts <subcommand>`. It auto-launches the cmux app — but cmux's socket is **default-deny**, so driving it needs auth (see the first Gotcha).
 
 > **Status (2026-07-07):** built and offline-verified — wrapper is type-clean (`tsc`/`bun build`), `voice` works live, public-clean grep passes, Kitty hooks untouched. **Live-driving (boot-team/race/fleet/monitor) is UNPROVEN** — it needs the socket-auth handshake, which has not yet executed. To prove it: run the wrapper *inside a cmux surface* (inherits auth), or set a cmux Settings socket password → `CMUX_SOCKET_PASSWORD`. **Security note:** a socket password lets any local process holding it drive your whole agent fleet — set it deliberately and never commit it to a public file.
 
@@ -24,7 +29,7 @@ Everything routes through one wrapper: `bun ~/.claude/skills/CMUX/Tools/cmux.ts 
 ## Quick Reference
 
 ```bash
-CT=~/.claude/skills/CMUX/Tools/cmux.ts
+CT=$SKILLS_DIR/CMUX/Tools/cmux.ts
 bun $CT ping                                             # ensure cmux is up (auto-launches)
 bun $CT boot-team --name debug --tiers orchestrator,lead,worker,worker
 bun $CT race --feature login-500 --agents 4             # first-to-solve wins
@@ -48,7 +53,7 @@ bun $CT flash --workspace workspace:1                    # visual attention
 - **Sidebar metadata is a no-auth Pulse bridge.** `report_meta` / `report_meta_block` / `set-status` / `set-progress` / `log` write agent status/progress into the workspace sidebar and persist to the session JSON at `~/Library/Application Support/cmux/session-*.json` — which is **readable without the socket**. LifeOS reads that file to mirror cmux agent state into Pulse without touching the auth wall.
 - **Mac-only.** cmux is a macOS app. The remote fleet still runs LifeOS, but cmux drives it via local SSH panes, not by running cmux on the minis. No Linux/WSL — that path is tmux.
 - **Refs are positional and can shift.** `workspace:1/surface:2` indexes move as you open/close things. For anything long-lived, resolve UUIDs (`--id-format uuids`) from `tree` and hold those.
-- **Public skill — private specifics live in USER config.** The remote fleet's hosts come from `~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/CMUX/fleet.json` (`{"hosts":[{"name","ssh"}]}`), never from this skill's files. The socket password comes from `CMUX_SOCKET_PASSWORD`.
+- **Public skill — private specifics live in USER config.** The remote fleet's hosts come from `$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/CMUX/fleet.json` (`{"hosts":[{"name","ssh"}]}`), never from this skill's files. The socket password comes from `CMUX_SOCKET_PASSWORD`.
 
 ## Examples
 

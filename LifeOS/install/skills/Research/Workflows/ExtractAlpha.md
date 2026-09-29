@@ -121,13 +121,13 @@ Capture the subtle genius buried in the content.
 **Use the current work item directory for all working files during analysis:**
 
 ```bash
-~/.claude/LIFEOS/MEMORY/WORK/{current_work}/
+$LIFEOS_DIR/MEMORY/WORK/{current_work}/
 ```
 
 **To get the current work directory:**
 1. Read `~/.claude/`
 2. Extract the `work_dir` value
-3. Use `~/.claude/LIFEOS/MEMORY/WORK/{work_dir}/` for temporary artifacts
+3. Use `$LIFEOS_DIR/MEMORY/WORK/{work_dir}/` for temporary artifacts
 
 **What goes in the work item directory:**
 - Raw transcripts from fabric -y
@@ -143,7 +143,7 @@ Capture the subtle genius buried in the content.
 
 **Example work item structure:**
 ```
-~/.claude/LIFEOS/MEMORY/WORK/{slug}/
+$LIFEOS_DIR/MEMORY/WORK/{slug}/
 ├── raw-transcript.txt
 ├── deep thinking-notes.md
 ├── draft-insights.md
@@ -236,10 +236,10 @@ Create a README.md in the history directory documenting the research:
 
 ```bash
 # 1. Get current work directory
-WORK_DIR=$(jq -r '.sessions | to_entries | map(select(.value.phase != "complete" and .value.mode != "native" and .value.mode != "starting")) | sort_by(.value.updatedAt) | reverse | .[0].key // empty' ~/.claude/LIFEOS/MEMORY/STATE/work.json)
+WORK_DIR=$(jq -r '.sessions | to_entries | map(select(.value.phase != "complete" and .value.mode != "native" and .value.mode != "starting")) | sort_by(.value.updatedAt) | reverse | .[0].key // empty' $LIFEOS_DIR/MEMORY/STATE/work.json)
 
 # 2. Work in current work item directory
-cd ~/.claude/LIFEOS/MEMORY/WORK/${WORK_DIR}/
+cd $LIFEOS_DIR/MEMORY/WORK/${WORK_DIR}/
 
 # 3. Extract content to work item directory
 fabric -y "YOUTUBE_URL" > raw-transcript.txt
@@ -372,7 +372,7 @@ When this skill activates, LifeOS should:
 
 1. **Load content** via appropriate method (fabric -y, WebFetch, Read, or paste)
 2. **Get current work directory** - Read `~/.claude/` for `work_dir`
-3. **Use work item directory** - Work in `~/.claude/LIFEOS/MEMORY/WORK/{work_dir}/`
+3. **Use work item directory** - Work in `$LIFEOS_DIR/MEMORY/WORK/{work_dir}/`
 4. **Engage deep thinking mode** - Deep extended thinking through all 10 dimensions
 5. **Extract insights** - Extract 24-30 highest-alpha ideas focusing on low-probability brilliant insights
 6. **Save to history** - Final outputs to `~/.claude/History/research/YYYY-MM-DD_description/`

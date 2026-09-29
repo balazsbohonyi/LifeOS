@@ -5,6 +5,11 @@ description: "Intakes external content, classifies chunks against LifeOS taxonom
 disable-model-invocation: true
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 # Migrate — external-content intake and classification
 
 ## 🚨 MANDATORY: Voice Notification
@@ -75,9 +80,9 @@ Collect the source path. If content is pasted, write it to a temp file first.
 Run the scanner:
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/MigrateScan.ts --source <path>
+bun $LIFEOS_DIR/TOOLS/MigrateScan.ts --source <path>
 # or
-echo "$CONTENT" | bun ~/.claude/LIFEOS/TOOLS/MigrateScan.ts --stdin
+echo "$CONTENT" | bun $LIFEOS_DIR/TOOLS/MigrateScan.ts --stdin
 ```
 
 Scanner output includes:
@@ -114,19 +119,19 @@ Based on the user's preference:
 
 **Fast path** (he says "approve all trusted"):
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/MigrateApprove.ts --approve-all
+bun $LIFEOS_DIR/TOOLS/MigrateApprove.ts --approve-all
 ```
 Commits everything non-UNCLEAR. Then walk through UNCLEAR chunks conversationally.
 
 **Category path** (he says "approve goals and wisdom, skip knowledge"):
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/MigrateApprove.ts --approve-target TELOS/GOALS.md
-bun ~/.claude/LIFEOS/TOOLS/MigrateApprove.ts --approve-target TELOS/WISDOM.md
+bun $LIFEOS_DIR/TOOLS/MigrateApprove.ts --approve-target TELOS/GOALS.md
+bun $LIFEOS_DIR/TOOLS/MigrateApprove.ts --approve-target TELOS/WISDOM.md
 ```
 
 **Walk-through path** (he wants careful review):
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/MigrateApprove.ts --review
+bun $LIFEOS_DIR/TOOLS/MigrateApprove.ts --review
 ```
 Show each pending chunk. For each:
 - Show preview + proposed target + confidence + alternatives

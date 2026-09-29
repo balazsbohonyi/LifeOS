@@ -27,10 +27,12 @@
  *
  * Pure and dependency-free beyond node builtins. Path checks are lexical over
  * repo-RELATIVE paths (git output); filesystem checks use lstat/realpath so a
- * symlinked component can never redirect or defeat them.
+ * symlinked component can never redirect or defeat them. Existing write targets
+ * with multiple hard links are refused too: appending through an in-root name
+ * would also mutate the same inode through an outside name.
  */
 
-import { closeSync, existsSync, lstatSync, openSync, readFileSync, readSync, realpathSync } from "node:fs";
+import { closeSync, lstatSync, openSync, readFileSync, readSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve as pathResolve, sep } from "node:path";
 
@@ -237,20 +239,50 @@ export function userDataRoot(): string {
  *     nowhere sanctioned to land must error loudly, never fall back.
  */
 export function assertInsideUserData(absTarget: string): { ok: true } | { ok: false; reason: string } {
+  const home = homedir();
+  const configDir = join(home, ".config");
+  const lifeosConfigDir = join(configDir, "LIFEOS");
+  const userRoot = userDataRoot();
+  for (const dir of [configDir, lifeosConfigDir, userRoot]) {
+    let st;
+    try {
+      st = lstatSync(dir);
+    } catch (e: any) {
+      return { ok: false, reason: `USER_DATA path cannot be inspected at ${dir} (${e?.message ?? e}) — refusing personal-data write (fail-closed)` };
+    }
+    if (st.isSymbolicLink()) {
+      return { ok: false, reason: `USER_DATA path contains a symlink at ${dir} — refusing personal-data write (fail-closed)` };
+    }
+    if (!st.isDirectory()) {
+      return { ok: false, reason: `USER_DATA path is not a directory at ${dir} — refusing personal-data write (fail-closed)` };
+    }
+  }
+
   let root: string;
   try {
-    root = realpathSync(userDataRoot());
+    root = realpathSync(userRoot);
   } catch (e: any) {
-    return { ok: false, reason: `USER_DATA root unresolvable at ${userDataRoot()} (${e?.message ?? e}) — refusing personal-data write (fail-closed)` };
+    return { ok: false, reason: `USER_DATA root unresolvable at ${userRoot} (${e?.message ?? e}) — refusing personal-data write (fail-closed)` };
   }
 
   let dir = pathResolve(absTarget);
   const tail: string[] = [];
-  while (!existsSync(dir)) {
-    const parent = dirname(dir);
-    if (parent === dir) return { ok: false, reason: `no existing ancestor for ${absTarget}` };
-    tail.unshift(basename(dir));
-    dir = parent;
+  while (true) {
+    try {
+      // lstat sees dangling symlinks and junctions. existsSync follows them
+      // and reports false, which could let a missing tail be reconstructed
+      // beneath USER_DATA even though the eventual write follows the link out.
+      lstatSync(dir);
+      break;
+    } catch (e: any) {
+      if (e?.code !== "ENOENT") {
+        return { ok: false, reason: `cannot inspect ${dir} (${e?.message ?? e})` };
+      }
+      const parent = dirname(dir);
+      if (parent === dir) return { ok: false, reason: `no existing ancestor for ${absTarget}` };
+      tail.unshift(basename(dir));
+      dir = parent;
+    }
   }
   let real: string;
   try {
@@ -259,7 +291,22 @@ export function assertInsideUserData(absTarget: string): { ok: true } | { ok: fa
     return { ok: false, reason: `cannot resolve ${dir} (${e?.message ?? e})` };
   }
   const resolved = tail.length > 0 ? join(real, ...tail) : real;
-  if (resolved === root || resolved.startsWith(root + sep)) return { ok: true };
+  if (resolved === root || resolved.startsWith(root + sep)) {
+    try {
+      // Inspect the resolved destination: a leaf symlink can point at an
+      // in-root hard-link alias, and appendFileSync follows that symlink.
+      const targetStat = lstatSync(resolved);
+      if (targetStat.isFile() && targetStat.nlink > 1) {
+        return {
+          ok: false,
+          reason: `write target has multiple hard links (${targetStat.nlink}): ${absTarget} — refusing a write that could mutate a file outside USER_DATA`,
+        };
+      }
+    } catch (e: any) {
+      if (e?.code !== "ENOENT") return { ok: false, reason: `cannot inspect write target ${absTarget} (${e?.message ?? e})` };
+    }
+    return { ok: true };
+  }
   return {
     ok: false,
     reason: `resolved target ${resolved} is outside the USER_DATA repo (${root}) — personal data must never land in the system tree (SystemUserBoundary.md)`,

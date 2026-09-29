@@ -4,10 +4,15 @@ description: "Real Chrome/Brave + macOS Computer Use from inside the browser —
 version: 4.3.18
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 ## Customization
 
 **Before executing, check for user customizations at:**
-`~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/Interceptor/`
+`$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/Interceptor/`
 
 If this directory exists, load and apply any PREFERENCES.md, configurations, or resources found there. These override default behavior. If the directory does not exist, proceed with skill defaults.
 
@@ -49,7 +54,7 @@ Interceptor is a Chrome extension that operates through the actual browser UI pl
 **Tool:** `interceptor` CLI — Chrome/Brave extension that controls the real browser from inside, plus a macOS bridge that drives native apps, OS-level input, and full VM lifecycle.
 **Repo:** https://github.com/Hacker-Valley-Media/Interceptor
 **Install:** the signed `Interceptor-Browser-<v>.pkg` / `Interceptor-Full-<v>.pkg` from the upstream releases page, or `interceptor upgrade --full` on an existing install. Building from source is optional — see `Workflows/Update.md`.
-**Chrome extension:** the signed installer registers it for you. If you build from source instead, `Tools/Pin.sh` copies the built `extension/dist` into `~/.claude/skills/Interceptor/Extension/` — that directory does **not** ship with the skill, `Pin.sh` creates it — and Chrome loads it via "Load unpacked". Provenance is recorded in `Extension/PINNED_FROM.txt` (source path, manifest version, content SHA256, timestamp). Chrome disables unpacked extensions on every manifest bump, so after any source rebuild the copy must be **re-pinned and reloaded**. It does NOT auto-follow upstream.
+**Chrome extension:** the signed installer registers it for you. If you build from source instead, `Tools/Pin.sh` copies the built `extension/dist` into `$SKILLS_DIR/Interceptor/Extension/` — that directory does **not** ship with the skill, `Pin.sh` creates it — and Chrome loads it via "Load unpacked". Provenance is recorded in `Extension/PINNED_FROM.txt` (source path, manifest version, content SHA256, timestamp). Chrome disables unpacked extensions on every manifest bump, so after any source rebuild the copy must be **re-pinned and reloaded**. It does NOT auto-follow upstream.
 **Pinned binary:** any `interceptor >= 0.23.16` works with this skill. (Maintainer machine note — does not describe public installs: the maintainer's binary is built from a local branch `local-0.23.16`, upstream tag `v0.23.16` plus a cherry-picked `screenshot --save` fix that honors `--out` and defaults to `~/Downloads`; re-cherry-pick on every upgrade until upstreamed, and build from source rather than `interceptor update` since the self-updater would drop the patch. On a stock install, `screenshot --save` writes to cwd — pass `--out` explicitly.) Upstream is a **three-surface** control plane: **Browser** + **macOS** + **iOS** (drive an owned, Developer-Mode iPhone via an on-device XCUITest runner over WiFi — `interceptor ios *`). **Tab Lifecycle Policy (new in 0.23.3):** named-group reuse is default-on and idle managed groups auto-close after 10 min — see Tab hygiene below.
 
 ### Capabilities Overview — Six Verb Trees
@@ -128,7 +133,7 @@ One-line test: **one page you could log into → Interceptor; N items on a named
 Before any `interceptor open|read|act|inspect|screenshot|navigate|tab|monitor|net|cookies|scroll|click|type` lands in Chrome, the workflow runs the gate. Prefer the **auto-recovering entry point** — it runs the gate and, if the test profile window just isn't open, launches it and re-verifies before returning:
 
 ```bash
-bash ~/.claude/skills/Interceptor/Tools/EnsureTestProfile.sh   # runs the gate; auto-launches the test profile on exit 5/6; prints READY on success
+bash $SKILLS_DIR/Interceptor/Tools/EnsureTestProfile.sh   # runs the gate; auto-launches the test profile on exit 5/6; prints READY on success
 ```
 
 `EnsureTestProfile.sh` wraps `PreflightIsolation.sh` (the raw gate — still callable directly when you want no auto-launch). Both exit non-zero on any unrecoverable failure; on non-zero, STOP and surface — never fall back to Default. The gate asserts these invariants:
@@ -186,10 +191,10 @@ This is the dangerous kind of failure: nothing errors. A responsive or animated 
 **The rule: any claim about animation, transitions, ResizeObserver/IntersectionObserver behavior, lazy-loading, scroll-reveal, or viewport-responsive layout MUST come from `Tools/VerifyViewport.ts`, never from the standard test context.** Driving a component's own recompute by hand to "prove" it works is testing your code with your own hand, not verifying the browser.
 
 ```bash
-bun ~/.claude/skills/Interceptor/Tools/VerifyViewport.ts check
-bun ~/.claude/skills/Interceptor/Tools/VerifyViewport.ts probe <url> --widths 1440,1100,880 --expr @probe.js
-bun ~/.claude/skills/Interceptor/Tools/VerifyViewport.ts shot  <url> --width 880 --out ~/Downloads/x.png
-bun ~/.claude/skills/Interceptor/Tools/VerifyViewport.ts stop
+bun $SKILLS_DIR/Interceptor/Tools/VerifyViewport.ts check
+bun $SKILLS_DIR/Interceptor/Tools/VerifyViewport.ts probe <url> --widths 1440,1100,880 --expr @probe.js
+bun $SKILLS_DIR/Interceptor/Tools/VerifyViewport.ts shot  <url> --width 880 --out ~/Downloads/x.png
+bun $SKILLS_DIR/Interceptor/Tools/VerifyViewport.ts stop
 ```
 
 **How it works, and why it can't be done any other way.** The anti-throttling switches (`--disable-backgrounding-occluded-windows`, `--disable-renderer-backgrounding`, `--disable-background-timer-throttling`) only take effect at **browser-process launch**, and one browser process serves one `--user-data-dir`. They therefore can never be applied to an already-running Chrome, and `--profile-directory` shares that process — so no amount of profile juggling fixes the operator's browser. VerifyViewport runs a **separate headless Chrome in its own `--user-data-dir`** with those flags. Headless creates no window at all, so it puts nothing on the operator's desktop and there is no window state left to depend on — while running the same renderer, with the full lifecycle live. `INTERCEPTOR_VERIFY_HEADFUL=1` gives a real (off-to-the-side) window when you need to watch a flow with your own eyes.
@@ -351,7 +356,7 @@ The full per-verb CLI listing — macOS Native (Computer Use), VM Lifecycle, Cor
 - **Never `screencapture`. Never `osascript` for Chrome focus, bounds, tabs, or windows.** Forbidden under Hard Prohibitions. Survives Interceptor failures.
 - **Anything lifecycle-dependent goes through `Tools/VerifyViewport.ts`** — animation, transitions, ResizeObserver/IntersectionObserver, lazy-load, scroll-reveal, viewport-responsive layout. The standard test context silently reports zero activity for all of these whenever its window isn't visible. See the Rendering-Lifecycle Gate section.
 - **Screenshots go through `Tools/Capture.sh`, never raw `interceptor screenshot`.** Capture.sh runs the preflight gate, enforces the not-Default target check, handles UUID-rot rebind, prefers the DOM-render path, and writes review artifacts to `$LIFEOS_DOWNLOADS_DIR` (default `~/Downloads/` when unset).
-- **Tab hygiene — upstream now cleans up after itself (Tab Lifecycle Policy, new in 0.23.3); `CleanupTabs.sh` is the backstop, not the primary mechanism.** Two built-in behaviors, both configured only from the extension popup (the popup is the sole writer): **(1) named-group reuse (default on)** — `interceptor open <url> --group <label>` navigates that group's most-recent tab instead of opening a new one (address-bar semantics), so a 40-step automation leaves one tab, not forty. Named groups only: in the shared default group "most recent tab" could be another agent's, so ungrouped `open` still creates — `--reuse` opts in anywhere, `--no-reuse` forces a new tab, `tab new` (the ⌘T verb) always creates. **(2) idle group close (default 10 min)** — a managed group no command has touched auto-closes (0 disables), never touching the focused window's active tab, a pinned tab, an audible tab, or a window's last tab; every sweep is logged and closed tabs are ⌘⇧T / `interceptor session restore` recoverable. Observe the resolved policy via `interceptor status --verbose` (`tabLifecycle` field). **Prefer `open --group <label>` during a task** so reuse does the cleanup for you. Still run `bash ~/.claude/skills/Interceptor/Tools/CleanupTabs.sh` once at the END as a backstop — it closes non-active tabs in the PINNED test context only, keeps the active tab (window stays alive), honors `--keep-url <substr>`, refuses Default/working profiles, and exits 0 when the context isn't connected. Belt-and-suspenders for ungrouped tabs the idle sweep hasn't reached. (Historical: 22 stale tabs observed 2026-07-13, before the lifecycle policy existed.)
+- **Tab hygiene — upstream now cleans up after itself (Tab Lifecycle Policy, new in 0.23.3); `CleanupTabs.sh` is the backstop, not the primary mechanism.** Two built-in behaviors, both configured only from the extension popup (the popup is the sole writer): **(1) named-group reuse (default on)** — `interceptor open <url> --group <label>` navigates that group's most-recent tab instead of opening a new one (address-bar semantics), so a 40-step automation leaves one tab, not forty. Named groups only: in the shared default group "most recent tab" could be another agent's, so ungrouped `open` still creates — `--reuse` opts in anywhere, `--no-reuse` forces a new tab, `tab new` (the ⌘T verb) always creates. **(2) idle group close (default 10 min)** — a managed group no command has touched auto-closes (0 disables), never touching the focused window's active tab, a pinned tab, an audible tab, or a window's last tab; every sweep is logged and closed tabs are ⌘⇧T / `interceptor session restore` recoverable. Observe the resolved policy via `interceptor status --verbose` (`tabLifecycle` field). **Prefer `open --group <label>` during a task** so reuse does the cleanup for you. Still run `bash $SKILLS_DIR/Interceptor/Tools/CleanupTabs.sh` once at the END as a backstop — it closes non-active tabs in the PINNED test context only, keeps the active tab (window stays alive), honors `--keep-url <substr>`, refuses Default/working profiles, and exits 0 when the context isn't connected. Belt-and-suspenders for ungrouped tabs the idle sweep hasn't reached. (Historical: 22 stale tabs observed 2026-07-13, before the lifecycle policy existed.)
 
 ## Delegating to Agents
 
@@ -366,7 +371,7 @@ Agent(subagent_type="general-purpose", prompt="
   Refs use eN syntax (no @ prefix) from tree output. Treat refs as short-lived.
   Background-first: only --activate and app activate move focus.
   PROFILE ISOLATION (MANDATORY GATE): the FIRST action of this task is
-    bash ~/.claude/skills/Interceptor/Tools/PreflightIsolation.sh
+    bash $SKILLS_DIR/Interceptor/Tools/PreflightIsolation.sh
   If that script exits non-zero, STOP and surface the message verbatim — do NOT
   fall back to operating against the Default profile, and do NOT use screencapture
   or osascript as substitutes. After the preflight returns OK, every browser
@@ -374,7 +379,7 @@ Agent(subagent_type="general-purpose", prompt="
   operator's main profile unless the parent agent explicitly says so.
   `act --trusted` for OS-level HID input (was --os).
   FINAL action after your work is done and evidence captured: run
-    bash ~/.claude/skills/Interceptor/Tools/CleanupTabs.sh
+    bash $SKILLS_DIR/Interceptor/Tools/CleanupTabs.sh
   to close the tabs you opened in the test profile (keeps the active tab).
   [your specific task instructions here]
 ")
@@ -538,5 +543,5 @@ Passes all major bot detection:
 After completing any workflow, append a single JSONL entry:
 
 ```bash
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Interceptor","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> ~/.claude/LIFEOS/MEMORY/SKILLS/execution.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","skill":"Interceptor","workflow":"WORKFLOW_USED","input":"8_WORD_SUMMARY","status":"ok|error","duration_s":SECONDS}' >> $LIFEOS_DIR/MEMORY/SKILLS/execution.jsonl
 ```

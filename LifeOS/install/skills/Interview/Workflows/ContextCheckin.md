@@ -24,13 +24,13 @@ curl -s -X POST http://localhost:31337/notify \
 Four readers. All at the start. The context is on file and the observed data is in cache; we ground every prompt in both — never in what we'd ask if we had no idea, and never in file age alone when the data can say what changed.
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/TelosFreshness.ts --json          # per-section TELOS
-bun ~/.claude/LIFEOS/TOOLS/TelosFreshness.ts --state         # CURRENT_STATE/ + IDEAL_STATE/ dimension files
-bun -e "import { readContextFreshness } from '$HOME/.claude/LIFEOS/TOOLS/TelosFreshness'; console.log(JSON.stringify(readContextFreshness(), null, 2))"
-bun ~/.claude/LIFEOS/TOOLS/StateEvidence.ts --markdown       # observed reality per domain (also refreshes the cache)
+bun $LIFEOS_DIR/TOOLS/TelosFreshness.ts --json          # per-section TELOS
+bun $LIFEOS_DIR/TOOLS/TelosFreshness.ts --state         # CURRENT_STATE/ + IDEAL_STATE/ dimension files
+bun -e "import { readContextFreshness } from '$LIFEOS_DIR/TOOLS/TelosFreshness'; console.log(JSON.stringify(readContextFreshness(), null, 2))"
+bun $LIFEOS_DIR/TOOLS/StateEvidence.ts --markdown       # observed reality per domain (also refreshes the cache)
 ```
 
-If `StateEvidence` output is missing or its cache is older than a day, run `bun ~/.claude/LIFEOS/TOOLS/InterviewDue.ts --refresh` once and re-read — the interview must argue from today's data, not last week's.
+If `StateEvidence` output is missing or its cache is older than a day, run `bun $LIFEOS_DIR/TOOLS/InterviewDue.ts --refresh` once and re-read — the interview must argue from today's data, not last week's.
 
 **Fifth reader — the work system (principal directive, 2026-08-12).** When the work-hub skill is installed (its repo is named in the private operational rules, never here), pull the open issue registry before reviewing Goals, Projects, or Ideas:
 
@@ -49,7 +49,7 @@ curl -s http://localhost:31337/api/telos/freshness | jq # per-section TELOS
 
 Parse and combine into a single sorted list of stale items — TELOS sections, constitutional files, AND state dimension files share the same conceptual surface from the principal's view. Sort most-stale-first by days-over-threshold.
 
-`bun ~/.claude/LIFEOS/TOOLS/InterviewScan.ts --json` produces this combined list already prioritized — state targets carry `domain`, `evidence_live`, and `evidence_days_since_review`, and an evidence-backed stale file outranks everything else in its phase. Prefer it over hand-merging.
+`bun $LIFEOS_DIR/TOOLS/InterviewScan.ts --json` produces this combined list already prioritized — state targets carry `domain`, `evidence_live`, and `evidence_days_since_review`, and an evidence-backed stale file outranks everything else in its phase. Prefer it over hand-merging.
 
 ### Step 1.5 — The evidence pass (what makes this interview different)
 
@@ -68,7 +68,7 @@ Rules for the evidence pass:
 - **Metric identity matters.** Compare like with like: `rhr_avg_*` (Oura lowest sleeping HR) is the RHR comparator; `sleep_hr_avg_*` (average HR during sleep) runs higher and is NOT resting heart rate. Wrist HRV also reads lower than chest-strap numbers — name the instrument when the gap could be the sensor.
 - **Single-timestamp sources understate their skew.** The expense ledger exposes one `meta.updated` date, so money's "unexamined data" figure reflects the last ledger write, not months of history behind it — say "ledger last updated {date}" rather than leaning on the day count.
 
-If `readContextFreshness()` reports a file with `why: "no frontmatter"`, the migration hasn't been run on that file. Stop and prompt: *"<file> doesn't have the freshness convention yet. Want me to run `bun ~/.claude/LIFEOS/TOOLS/MigrateContextFreshness.ts` first?"*
+If `readContextFreshness()` reports a file with `why: "no frontmatter"`, the migration hasn't been run on that file. Stop and prompt: *"<file> doesn't have the freshness convention yet. Want me to run `bun $LIFEOS_DIR/TOOLS/MigrateContextFreshness.ts` first?"*
 
 If `readContextFreshness()` reports a file with `why: "source missing"`, the file's `derived_from:` source doesn't have a freshness signal — the derivative can't inherit one. Surface this to the principal: *"<file> derives from <source> which has no freshness frontmatter. Want me to add it?"*
 
@@ -161,11 +161,11 @@ workflow (and equivalent principal-driven review flows) should call it.
 
 ```bash
 # TELOS section — section-level marker
-bun ~/.claude/LIFEOS/TOOLS/TelosFreshness.ts --bump <slug>
+bun $LIFEOS_DIR/TOOLS/TelosFreshness.ts --bump <slug>
 
 # Constitutional file OR state dimension file — review marker
 # (NOT bumpContextTimestamp; that's for writes)
-bun -e "import { bumpReviewedTimestamp } from '$HOME/.claude/LIFEOS/TOOLS/TelosFreshness'; console.log(bumpReviewedTimestamp('<absolute-path>', 'user'))"
+bun -e "import { bumpReviewedTimestamp } from '$LIFEOS_DIR/TOOLS/TelosFreshness'; console.log(bumpReviewedTimestamp('<absolute-path>', 'user'))"
 ```
 
 State dimension files use the same `bumpReviewedTimestamp` — a ratified-or-declined-with-review walk of a CURRENT_STATE/IDEAL_STATE file counts as a review even when no edit landed (the principal looked and said "still right").
@@ -206,8 +206,8 @@ Re-affirming without edits still bumps the review marker. Declining the whole le
 When the principal says enough:
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/TelosFreshness.ts        # final TELOS state
-bun ~/.claude/LIFEOS/TOOLS/ContextAudit.ts          # content quality findings (read-only)
+bun $LIFEOS_DIR/TOOLS/TelosFreshness.ts        # final TELOS state
+bun $LIFEOS_DIR/TOOLS/ContextAudit.ts          # content quality findings (read-only)
 ```
 
 Voice-summarize:
@@ -217,14 +217,14 @@ Voice-summarize:
 Regenerate the auto-derived files so future sessions pick up source changes:
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/GenerateTelosSummary.ts 2>/dev/null || true
-bun ~/.claude/LIFEOS/TOOLS/ArchitectureSummaryGenerator.ts generate 2>/dev/null || true
+bun $LIFEOS_DIR/TOOLS/GenerateTelosSummary.ts 2>/dev/null || true
+bun $LIFEOS_DIR/TOOLS/ArchitectureSummaryGenerator.ts generate 2>/dev/null || true
 ```
 
 Record completion and refresh every cache the statusline and next session read — this is what silences the 🎤 chip:
 
 ```bash
-bun ~/.claude/LIFEOS/TOOLS/InterviewDue.ts --mark-done
+bun $LIFEOS_DIR/TOOLS/InterviewDue.ts --mark-done
 ```
 
 Send a Pulse `/reload` so the freshness cache invalidates:
@@ -236,7 +236,7 @@ curl -s -X POST http://localhost:31337/reload > /dev/null 2>&1 &
 **Sync the work slice to Vector** (standing directive, {PRINCIPAL.NAME} 2026-08-12). If any ratified edit this run touched company-relevant content — business goals (revenue targets like G2), work strategies or projects, company state — push that slice to the principal's company tenant on the Vector platform (tenant named in the private `LIFEOS/USER/CONFIG/OPERATIONAL_RULES.md` Vector rules, never here) through the Vector gateway (`_VECTOR`, a private skill NOT in the public release payload — installs without it skip this sync; writes are steward-gated). Selective by design: personal material (health, traumas, finances, relationships, private narratives) never crosses. The write path:
 
 ```bash
-bun ~/.claude/skills/_VECTOR/Tools/Vector.ts propose-telos <section> "<Title>" --file <body.md>
+bun $SKILLS_DIR/_VECTOR/Tools/Vector.ts propose-telos <section> "<Title>" --file <body.md>
 # sections: mission | goals | metrics | challenges | strategies | projects | team | budget
 ```
 
@@ -304,7 +304,7 @@ voice-confirm
 
 ## Failure modes
 
-- **Migration not run yet.** First call to `readContextFreshness()` returns one or more files with `why: "no frontmatter"`. Run `bun ~/.claude/LIFEOS/TOOLS/MigrateContextFreshness.ts` once before continuing.
+- **Migration not run yet.** First call to `readContextFreshness()` returns one or more files with `why: "no frontmatter"`. Run `bun $LIFEOS_DIR/TOOLS/MigrateContextFreshness.ts` once before continuing.
 - **Pulse not running.** Voice notifications fail silently; HTTP routes return connection errors. Conversation continues using the lib directly.
 - **Source missing for a derived file.** `architecture_summary` may show `why: "source missing"` if `LifeosSystemArchitecture.md` has no `last_updated` frontmatter. Surface to the principal; offer to add it.
 - **Slug not found by bumpTelosTimestamp.** Returns `sectionFound: false`. Re-check `sectionSlug(headingText)`.

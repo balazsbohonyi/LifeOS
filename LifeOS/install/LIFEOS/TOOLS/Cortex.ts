@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 import { existsSync, lstatSync, opendirSync, readFileSync, realpathSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
-import { homedir } from "node:os";
 import { createHash } from "node:crypto";
 import { createCaptureEnvelope, isEnvelopeValidAt } from "./CaptureEnvelope";
+import { resolveRuntimePaths } from "./RuntimePaths";
 
 export const SCHEMA = "lifeos-cortex/v1" as const;
 export const EXIT = { OK: 0, INTERNAL: 1, NOT_FOUND: 3, INVALID_INPUT: 4, WRITE_REFUSED: 5 } as const;
@@ -15,7 +15,11 @@ const COMMANDS = new Set(["status", "search", "timeline", "get", "export", "reme
 
 export interface CortexEnvelope { schema: typeof SCHEMA; ok: boolean; command: string; data: unknown; error: null | { code: string; message: string } }
 export interface CortexRunResult { exitCode: number; envelope: CortexEnvelope }
-export interface CortexRuntime { memoryRoot?: string; memoryAdd?: (item: any) => any }
+export interface CortexRuntime {
+  /** Read-only diagnostic root override. Writes always use MemorySystem's canonical runtime root. */
+  memoryRoot?: string;
+  memoryAdd?: (item: any) => any;
+}
 export interface CortexRecord { id: string; type: string; title: string; created: string; updated: string; provenance: { source: string; session: string | null; path: string }; content: string; related: string[]; valid_from?: string | null; valid_until?: string | null }
 export interface CortexCard { id: string; type: string; created: string; updated: string; provenance: CortexRecord["provenance"]; score: number; est_tokens: number }
 
@@ -264,6 +268,9 @@ export async function runCortex(args: string[], runtime: CortexRuntime = {}): Pr
   if (typeof parsedResult === "string") return fail(command, EXIT.INVALID_INPUT, "invalid_input", parsedResult);
   const parsed = parsedResult;
   if ((command === "remember" || command === "propose")) {
+    if (runtime.memoryRoot || opt(parsed, "--memory-root") || process.env.CORTEX_MEMORY_ROOT) {
+      return fail(command, EXIT.WRITE_REFUSED, "write_refused", "Read-only memory-root overrides cannot be used with write commands");
+    }
     const adapter = opt(parsed, "--adapter");
     if (!adapter || !parsed.options.has("--allow-write")) return fail(command, EXIT.WRITE_REFUSED, "write_refused", "Write commands require explicit --adapter and --allow-write");
     if (parsed.positionals.length !== 1) return fail(command, EXIT.INVALID_INPUT, "invalid_input", "Write command requires exactly one JSON payload");
@@ -271,8 +278,14 @@ export async function runCortex(args: string[], runtime: CortexRuntime = {}): Pr
     let item:any;try{item=JSON.parse(raw);}catch{return fail(command,EXIT.INVALID_INPUT,"invalid_input","Write payload must be valid JSON");}
     const durableTypes = new Set(["memory", "idea", "knowledge"]);
     if ((command === "propose" && item?.type !== "proposal") || (command === "remember" && !durableTypes.has(item?.type))) return fail(command, EXIT.WRITE_REFUSED, "write_refused", `${command} payload type is not authorized for this command`);
-    const memoryAdd=runtime.memoryAdd??(await import("./MemorySystem")).add; const result=memoryAdd(item);
+    const memoryAdd=runtime.memoryAdd??(await import("./MemorySystem")).add;
+    let result: any;
+    try { result = await memoryAdd(item); }
+    catch (error) { return fail(command, EXIT.WRITE_REFUSED, "write_failed", error instanceof Error ? error.message : String(error)); }
     if(!result?.ok)return fail(command,EXIT.WRITE_REFUSED,"governance_refused",String(result?.message??result?.code??"MemorySystem refused write"));
+    if (typeof result.path !== "string" || !existsSync(result.path)) {
+      return fail(command, EXIT.INTERNAL, "write_unverified", "MemorySystem reported success but the saved note could not be verified on disk");
+    }
     return ok(command,{adapter,result});
   }
   if(command==="status"&&parsed.positionals.length) return fail(command,EXIT.INVALID_INPUT,"invalid_input","status accepts no positional arguments");
@@ -280,7 +293,7 @@ export async function runCortex(args: string[], runtime: CortexRuntime = {}): Pr
   if(command==="search"&&parsed.positionals.length!==1) return fail(command,EXIT.INVALID_INPUT,"invalid_input","search requires exactly one query");
   if(command==="timeline"&&parsed.positionals.length) return fail(command,EXIT.INVALID_INPUT,"invalid_input","timeline accepts no positional arguments");
   if((command==="get"||command==="export")&&(parsed.positionals.length===0||parsed.positionals.length>LIMITS.IDS)) return fail(command,EXIT.INVALID_INPUT,"invalid_input",`${command} requires one or more explicit IDs (maximum ${LIMITS.IDS})`);
-  const requestedRoot=resolve(runtime.memoryRoot??opt(parsed,"--memory-root")??process.env.CORTEX_MEMORY_ROOT??join(homedir(),".claude/LIFEOS/MEMORY"));
+  const requestedRoot=resolve(runtime.memoryRoot??opt(parsed,"--memory-root")??process.env.CORTEX_MEMORY_ROOT??resolveRuntimePaths().memoryDir);
   let memoryRoot=requestedRoot, records:CortexRecord[];try{const corpus=enumerateCanonicalCorpus(requestedRoot);memoryRoot=corpus.root;records=corpus.records;}catch(error){if(error instanceof IntegrityError)return fail(command,EXIT.INVALID_INPUT,"integrity_error",error.message);return fail(command,EXIT.INTERNAL,"internal_error",error instanceof Error?error.message:String(error));}
   if(command==="status")return ok(command,{canonical:{root:memoryRoot,records:records.length},mode:"local-read-only",indexes:[]});
   if(command==="rebuild"){const canonical=canonicalCorpusDigest(records);const rebuilt=canonicalCorpusDigest(JSON.parse(JSON.stringify(records)));return ok(command,{format:"lifeos-cortex-canonical-rebuild/v1",canonical_digest:canonical,rebuilt_digest:rebuilt,equivalent:canonical===rebuilt,records:records.length,indexes:[]});}

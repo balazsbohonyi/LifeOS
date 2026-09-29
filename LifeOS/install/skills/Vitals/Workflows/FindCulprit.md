@@ -20,9 +20,9 @@ A named culprit (or an explicit "nothing is actually wrong — here's what you n
 ## Tools
 
 ```bash
-bun ~/.claude/skills/Vitals/Tools/Vitals.ts hogs      # live CPU + energy, second-sample (~3s)
-bun ~/.claude/skills/Vitals/Tools/Vitals.ts check     # system context: load, pressure, thermal, disk
-bun ~/.claude/skills/Vitals/Tools/Vitals.ts gpu       # GPU utilization (no sudo)
+bun $SKILLS_DIR/Vitals/Tools/Vitals.ts hogs      # live CPU + energy, second-sample (~3s)
+bun $SKILLS_DIR/Vitals/Tools/Vitals.ts check     # system context: load, pressure, thermal, disk
+bun $SKILLS_DIR/Vitals/Tools/Vitals.ts gpu       # GPU utilization (no sudo)
 ```
 
 ## Intent-to-Flag Mapping

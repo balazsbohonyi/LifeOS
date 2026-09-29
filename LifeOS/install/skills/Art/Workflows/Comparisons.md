@@ -285,7 +285,7 @@ Optional: Sign small in bottom right corner in charcoal (#2D2D2D).
 ### Step 5: Execute Generation
 
 ```bash
-bun run ~/.claude/skills/Art/Tools/Generate.ts \
+bun run $SKILLS_DIR/Art/Tools/Generate.ts \
   --workflow=Comparisons \
   --model nano-banana-pro \
   --prompt "[YOUR PROMPT]" \

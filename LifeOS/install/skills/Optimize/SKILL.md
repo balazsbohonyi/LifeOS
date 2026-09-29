@@ -5,6 +5,11 @@ description: "Autonomous optimization loop — hill-climb any target. Code with 
 disable-model-invocation: true
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 # /optimize — Autonomous Optimization v2
 
 ## What It Does
@@ -42,10 +47,10 @@ Inspired by Karpathy's [autoresearch](https://github.com/karpathy/autoresearch) 
 ### Eval Mode (skill/prompt/agent targets)
 
 ```
-/optimize --target "~/.claude/skills/ExtractWisdom"
-/optimize --target "~/.claude/skills/Research/Workflows/QuickResearch.md"
+/optimize --target "$SKILLS_DIR/ExtractWisdom"
+/optimize --target "$SKILLS_DIR/Research/Workflows/QuickResearch.md"
 /optimize --target "prompts/my-prompt.md"
-/optimize --target "~/.claude/skills/ExtractWisdom" --max-experiments 20
+/optimize --target "$SKILLS_DIR/ExtractWisdom" --max-experiments 20
 ```
 
 In eval mode, the system automatically:
@@ -116,9 +121,9 @@ When `/optimize` is invoked, the eval_mode is set based on arguments (`mode:` is
 ISC criteria become **guard rails** — assertions that must hold true across ALL experiments. Guard rails must REMAIN satisfied perpetually. A violation triggers automatic revert regardless of score improvement.
 
 **Reference files:**
-- `~/.claude/LIFEOS/ALGORITHM/optimize-loop.md` — the full loop protocol
-- `~/.claude/LIFEOS/ALGORITHM/eval-guide.md` — how to write good eval criteria
-- `~/.claude/LIFEOS/ALGORITHM/archive/target-types.md` — target detection and ISC generation
+- `$LIFEOS_DIR/ALGORITHM/optimize-loop.md` — the full loop protocol
+- `$LIFEOS_DIR/ALGORITHM/eval-guide.md` — how to write good eval criteria
+- `$LIFEOS_DIR/ALGORITHM/archive/target-types.md` — target detection and ISC generation
 
 ## Examples
 
@@ -154,7 +159,7 @@ ISC criteria become **guard rails** — assertions that must hold true across AL
 
 **Optimize a skill's Extract workflow:**
 ```
-/optimize --target "~/.claude/skills/ExtractWisdom" --max-experiments 15
+/optimize --target "$SKILLS_DIR/ExtractWisdom" --max-experiments 15
 ```
 
 **Optimize a standalone prompt:**
@@ -164,7 +169,7 @@ ISC criteria become **guard rails** — assertions that must hold true across AL
 
 **Optimize with custom criteria:**
 ```
-/optimize --target "~/.claude/skills/Research/Workflows/QuickResearch.md" \
+/optimize --target "$SKILLS_DIR/Research/Workflows/QuickResearch.md" \
   --criteria "Does the output contain specific facts with sources?" \
             "Is the output structured with clear sections?" \
             "Does the output avoid generic filler?" \

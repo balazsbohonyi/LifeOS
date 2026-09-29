@@ -32,7 +32,7 @@ curl -s -X POST http://localhost:31337/notify \
 
 ### Step 2 — Establish the WORK dir
 
-Resolve the canonical LifeOS work dir — **`~/.claude/LIFEOS/MEMORY/WORK/{slug}/`** (absolute; the same dir Scaffold writes the ISA to, so the handoff stays co-located). Use this path even when `/grill-me` is invoked from another repo's cwd — it is NOT project-relative, and it is NOT a bare `~/.claude/MEMORY/WORK/` outside the `LIFEOS/` tree. Create `grill.md` there with three sections: **Shape & Key Decisions**, **Q&A Log**, **Open Flags**. This file is the checkpoint target — never a project-root `brainstorms/` folder.
+Resolve the canonical LifeOS work dir — **`$LIFEOS_DIR/MEMORY/WORK/{slug}/`** (absolute; the same dir Scaffold writes the ISA to, so the handoff stays co-located). Use this path even when `/grill-me` is invoked from another repo's cwd — it is NOT project-relative. Create `grill.md` there with three sections: **Shape & Key Decisions**, **Q&A Log**, **Open Flags**. This file is the checkpoint target — never a project-root `brainstorms/` folder.
 
 ### Step 3 — Shape check (only if the category is ambiguous)
 

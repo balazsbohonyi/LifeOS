@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getTelosContext } from "@/lib/telos-data"
+import { getDashboardRuntimePaths } from "@/lib/runtime-paths"
 import { spawn } from "child_process"
 
 export async function POST(request: Request) {
@@ -29,9 +30,9 @@ When answering questions:
 
     // Use Inference tool instead of direct API
     const inferenceResult = await new Promise<{ success: boolean; output?: string; error?: string }>((resolve) => {
-      const homeDir = process.env.HOME || ''
+      const inferencePath = `${getDashboardRuntimePaths().toolsDir}/Inference.ts`
       // medium (Sonnet): cross-section synthesis over the user's full TELOS; low/haiku goes shallow (task-intelligence review P3)
-      const proc = spawn('bun', ['run', `${homeDir}/.claude/LIFEOS/TOOLS/Inference.ts`, '--level', 'medium', systemPrompt, message], {
+      const proc = spawn('bun', ['run', inferencePath, '--level', 'medium', systemPrompt, message], {
         stdio: ['ignore', 'pipe', 'pipe'],
       })
 

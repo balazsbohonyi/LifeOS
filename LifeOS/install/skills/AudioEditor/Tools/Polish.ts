@@ -23,7 +23,9 @@ for (const __k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
 
 import { existsSync, readFileSync } from "fs";
 import { basename, dirname, extname, join, resolve } from "path";
-import { homedir } from "os";
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts";
+
+const RUNTIME_PATHS = resolveRuntimePaths();
 
 // Normalize env path vars that Claude Code injects without shell expansion (LifeOS#1404)
 for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
@@ -33,13 +35,11 @@ for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
 
 
 // ============================================================================
-// Environment Loading — keys from ~/.claude/.env
+// Environment Loading — keys from the active harness config root's .env
 // ============================================================================
 
 function loadEnv(): void {
-  // Canonical .env is ~/.claude/.env — never $LIFEOS_CONFIG_DIR/.env, which
-  // resolves to the dead ~/.claude/LIFEOS/.env path (public issue #1490).
-  const envPath = resolve(homedir(), ".claude/.env");
+  const envPath = RUNTIME_PATHS.envPath;
   try {
     const content = readFileSync(envPath, "utf-8");
     for (const line of content.split("\n")) {
@@ -84,7 +84,7 @@ if (!existsSync(audioFile)) {
 
 const apiKey = process.env.CLEANVOICE_API_KEY;
 if (!apiKey) {
-  console.error("CLEANVOICE_API_KEY not found. Set it in ~/.claude/.env");
+  console.error(`CLEANVOICE_API_KEY not found. Set it in ${RUNTIME_PATHS.envPath}`);
   console.error("Get key at: https://cleanvoice.ai → Dashboard → Settings → API Key");
   process.exit(1);
 }

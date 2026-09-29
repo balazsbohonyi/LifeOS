@@ -18,7 +18,8 @@
  */
 
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { join } from "node:path";
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts";
 
 // ============================================================================
 // Types
@@ -67,10 +68,7 @@ interface PromptOutput {
 // Constants
 // ============================================================================
 
-const ART_AESTHETIC_PATH = resolve(
-  process.env.HOME!,
-  ".claude/LIFEOS/Aesthetic.md"
-);
+const ART_AESTHETIC_PATH = join(resolveRuntimePaths().lifeosDir, "Aesthetic.md");
 
 const COLOR_HEX_MAP: Record<TokyoNightColor, string> = {
   "Electric Blue": "#7aa2f7",

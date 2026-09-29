@@ -158,7 +158,7 @@ open "<REFERENCE_WALLPAPER>"
 ### Step 4: Generate
 
 ```bash
-bun run ~/.claude/skills/Art/Tools/Generate.ts \
+bun run $SKILLS_DIR/Art/Tools/Generate.ts \
   --workflow=EmbossedLogoWallpaper \
   --model nano-banana-pro \
   --prompt "[CONSTRUCTED_PROMPT]" \

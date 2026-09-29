@@ -22,6 +22,7 @@ import { join, resolve } from "node:path";
 import { lstatSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { checkSymlinkContract, detectDevTree, setupUserSeparation } from "./InstallEngine";
+import { resolveRuntimePaths } from "../../../LIFEOS/TOOLS/RuntimePaths.ts";
 
 /** Canonical on-disk path, or null when the path does not exist. */
 function realPath(p: string): string | null {
@@ -54,7 +55,9 @@ function main(): void {
     return i >= 0 && a[i + 1] && !a[i + 1].startsWith("--") ? a[i + 1] : undefined;
   };
   const home = process.env.HOME || homedir(); // public issue #1729, @umair-a11y
-  const configRoot = get("--config-root") || process.env.CLAUDE_CONFIG_DIR || join(home, ".claude");
+  // Keep the explicit override for repair workflows; otherwise follow the
+  // active harness so Codex setup never silently links into ~/.claude.
+  const configRoot = get("--config-root") || resolveRuntimePaths().configRoot;
   const configDir = get("--config-dir") || process.env.LIFEOS_CONFIG_DIR || join(home, ".config", "LIFEOS");
   const apply = a.includes("--apply");
   const allowDev = a.includes("--allow-dev");

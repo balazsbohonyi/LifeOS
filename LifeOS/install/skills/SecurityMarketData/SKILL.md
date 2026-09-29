@@ -4,13 +4,18 @@ version: 1.0.0
 description: Query curated cybersecurity market and company intelligence. USE WHEN security market data OR cybersecurity funding OR cyber M&A OR security-company/investor research OR market maps OR deal activity OR Return on Security OR The Signal. NOT FOR vulnerability research, security news, or investment advice.
 ---
 
+## Active Runtime Paths
+
+Resolve runtime paths before using a path from this skill. In Codex, use `CODEX_HOME` (or `~/.codex` when Codex session markers are present); in Claude Code, use `CLAUDE_CONFIG_DIR` (or `~/.claude`). `$LIFEOS_DIR` is the active runtime's `LIFEOS` directory, `$SKILLS_DIR` is its `skills` directory, and `$LIFEOS_SKILL_DIR` is this skill's directory. Codex markers take precedence over stale Claude settings.
+
+
 # SecurityMarketData
 
 Query Return on Security's Signal data through its live MCP interface, with evidence, freshness, and analytical boundaries intact.
 
 ## Customization
 
-Before executing, check `~/.claude/LIFEOS/USER/CUSTOMIZATIONS/SKILLS/SecurityMarketData/`. If present, load enabled preferences and configuration; otherwise use these defaults.
+Before executing, check `$LIFEOS_DIR/USER/CUSTOMIZATIONS/SKILLS/SecurityMarketData/`. If present, load enabled preferences and configuration; otherwise use these defaults.
 
 ## Voice Notification
 

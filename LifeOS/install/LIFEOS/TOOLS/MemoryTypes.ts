@@ -36,13 +36,13 @@
  */
 
 import { resolve as pathResolve, join as pathJoin } from "node:path";
-import { homedir } from "node:os";
+import { resolveRuntimePaths } from "./RuntimePaths";
 
 // ── Paths ──
 
-const CLAUDE_ROOT = pathResolve(homedir(), ".claude");
-const LIFEOS_DIR = pathJoin(CLAUDE_ROOT, "LIFEOS");
-const KNOWLEDGE_DIR = pathJoin(LIFEOS_DIR, "MEMORY", "KNOWLEDGE");
+const RUNTIME_PATHS = resolveRuntimePaths();
+const LIFEOS_DIR = RUNTIME_PATHS.lifeosDir;
+const KNOWLEDGE_DIR = pathJoin(RUNTIME_PATHS.memoryDir, "KNOWLEDGE");
 
 export const PRINCIPAL_MEMORY_PATH = pathJoin(LIFEOS_DIR, "USER", "PRINCIPAL", "PRINCIPAL_MEMORY.md");
 export const DA_MEMORY_PATH = pathJoin(LIFEOS_DIR, "USER", "DIGITAL_ASSISTANT", "DA_MEMORY.md");
@@ -74,7 +74,7 @@ export type Tier = "A" | "B" | "C";
 export type LoadTiming = "always" | "on-relevance" | "surface-only";
 export type WriteMode = "set-overwrite" | "append" | "queue";
 export type Actor = "principal" | "assistant";
-export type EntityType = "person" | "company" | "research";
+export type EntityType = "person" | "company" | "research" | "blog";
 
 /**
  * Minimum payload for each type. The reviewer subprocess and MemorySystem.add()
@@ -150,12 +150,15 @@ export interface KnowledgeItem {
   name: string;
   content: string;
   source_session?: string;
+  source_url?: string;
+  source_name?: string;
+  source_author?: string;
+  source_date?: string;
   confidence?: number;
   /**
    * Typed cross-links into the existing KNOWLEDGE graph. Empty array is
-   * valid but discouraged — the reviewer should populate at least one link
-   * based on conversation context. The writer preserves these on append and
-   * deduplicates by slug.
+   * valid when no real link is known. Never invent related notes just to fill
+   * the field. The writer preserves these on append and deduplicates by slug.
    */
   related?: RelatedLink[];
 }
@@ -318,6 +321,7 @@ function entityTypeToSubdir(et: EntityType): string {
     case "person":   return "People";
     case "company":  return "Companies";
     case "research": return "Research";
+    case "blog":     return "Blogs";
   }
 }
 
@@ -358,7 +362,7 @@ const _REGISTRY: Record<MemoryTypeName, TypeRegistryEntry> = {
     load_timing: "on-relevance",
     tier: "B",
     write_mode: "append",
-    description: "Entity note (person / company / research). Loads on relevance.",
+    description: "Entity or source note (person / company / research / blog). Loads on relevance.",
   },
   proposal: {
     // Proposals always queue to the single pending-proposals.jsonl. The
@@ -445,6 +449,8 @@ function smokeTest(): number {
   check("knowledge(company) → KNOWLEDGE/Companies/", kCompany.endsWith("/MEMORY/KNOWLEDGE/Companies/anthropic.md"), kCompany);
   const kResearch = resolveStoragePath({ type: "knowledge", entity_type: "research", name: "Honcho Paper", content: "..." });
   check("knowledge(research) → KNOWLEDGE/Research/", kResearch.endsWith("/MEMORY/KNOWLEDGE/Research/honcho-paper.md"), kResearch);
+  const kBlog = resolveStoragePath({ type: "knowledge", entity_type: "blog", name: "Workplace and Mental Health", content: "..." });
+  check("knowledge(blog) → KNOWLEDGE/Blogs/", kBlog.endsWith("/MEMORY/KNOWLEDGE/Blogs/workplace-and-mental-health.md"), kBlog);
 
   // 7. Path resolution — idea routes to KNOWLEDGE/Ideas/
   const idea = resolveStoragePath({ type: "idea", title: "Single Memory System Insight", content: "..." });
