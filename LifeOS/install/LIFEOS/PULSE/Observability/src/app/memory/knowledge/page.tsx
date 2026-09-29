@@ -10,6 +10,7 @@ import { Users, Building2, Lightbulb, Clock, Search, X, FileText, BookOpen, News
 import Link from "next/link";
 import { wikiPageUrl } from "@/lib/wiki-links";
 import { PageShell, PageHeader, Panel, PanelHeader, StatTile, Pill, type Dim } from "@/components/ui/chrome";
+import RuntimePath from "@/lib/runtime-paths";
 
 interface WikiPage {
   slug: string;
@@ -276,7 +277,7 @@ function KnowledgeLanding({ data }: { data: WikiIndex }) {
         {isFreshInstall && (
           <EmptyStateGuide
             section="Cortex"
-            description="Everything the system knows — people, companies, ideas, research, work sessions (ISAs), lessons, and wisdom. Notes live under ~/.claude/LIFEOS/MEMORY/."
+            description={<>Everything the system knows — people, companies, ideas, research, work sessions (ISAs), lessons, and wisdom. Notes live under <code><RuntimePath root="memoryDir" fallback="LIFEOS/MEMORY" /></code>.</>}
             daPromptExample="help me start my memory archive"
           />
         )}

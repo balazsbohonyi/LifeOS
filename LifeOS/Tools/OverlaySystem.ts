@@ -40,8 +40,11 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { detectDevTree } from "./InstallEngine";
 
-/** Directories inside a system tree that are never overlaid, at any depth. */
+/** Directories excluded by default from recursive overlays. */
 const SKIP_DIRS = new Set(["node_modules", ".git", "MEMORY", "USER", "out", ".next"]);
+// Pulse ships a static dashboard export that is required at runtime. Include
+// only this owned `out` tree; unrelated generated/output directories stay skipped.
+const INCLUDED_PULSE_EXPORT = join("Observability", "out");
 
 /**
  * System-owned trees: [payload-relative, configRoot-relative].
@@ -112,7 +115,7 @@ function overlayTree(src: string, dst: string, what: string, apply: boolean): Ov
   const r: OverlayResult = { what, src, dst, present: existsSync(src), updated: 0, current: 0, created: 0, failures: [] };
   if (!r.present) return r;
 
-  const walk = (s: string, d: string): void => {
+  const walk = (s: string, d: string, relativeDir = ""): void => {
     let entries: string[];
     try {
       entries = readdirSync(s);
@@ -131,8 +134,10 @@ function overlayTree(src: string, dst: string, what: string, apply: boolean): Ov
       }
       if (st.isSymbolicLink()) continue; // never follow or replace symlinks (USER is one)
       if (st.isDirectory()) {
-        if (SKIP_DIRS.has(name)) continue;
-        walk(sp, dp);
+        const relativePath = join(relativeDir, name);
+        const isPulseDashboardExport = what === "LIFEOS/PULSE" && relativePath === INCLUDED_PULSE_EXPORT;
+        if (SKIP_DIRS.has(name) && !isPulseDashboardExport) continue;
+        walk(sp, dp, relativePath);
         continue;
       }
       if (!st.isFile()) continue;

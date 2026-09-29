@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import EmptyStateGuide from "@/components/EmptyStateGuide";
+import RuntimePath from "@/lib/runtime-paths";
 import {
   PageShell,
   PageHeader,
@@ -353,7 +354,7 @@ function AnthropicTab({ data }: { data: AnthropicData | null }) {
     return (
       <div className="p-8 text-ink-3">
         No ledger entries yet. CostTracker cron runs hourly — next entry at :00.
-        Run manually: <code className="mono">bun ~/.claude/LIFEOS/TOOLS/CostTracker.ts log</code>
+        Run manually: <code className="mono">bun <RuntimePath root="toolsDir" segments={["CostTracker.ts"]} fallback="LIFEOS/TOOLS" /> log</code>
       </div>
     );
 
@@ -503,19 +504,19 @@ function AnthropicTab({ data }: { data: AnthropicData | null }) {
         <div className="text-xs text-ink-3 space-y-1">
           <div>
             <span className="mono" style={{ color: "var(--money)" }}>
-              bun ~/.claude/LIFEOS/TOOLS/CostTracker.ts status
+              bun <RuntimePath root="toolsDir" segments={["CostTracker.ts"]} fallback="LIFEOS/TOOLS" /> status
             </span>{" "}
             — human-readable snapshot
           </div>
           <div>
             <span className="mono" style={{ color: "var(--money)" }}>
-              bun ~/.claude/LIFEOS/TOOLS/CostTracker.ts scan
+              bun <RuntimePath root="toolsDir" segments={["CostTracker.ts"]} fallback="LIFEOS/TOOLS" /> scan
             </span>{" "}
             — re-run static scan
           </div>
           <div>
             <span className="mono" style={{ color: "var(--money)" }}>
-              bun ~/.claude/LIFEOS/TOOLS/CostTracker.ts baseline
+              bun <RuntimePath root="toolsDir" segments={["CostTracker.ts"]} fallback="LIFEOS/TOOLS" /> baseline
             </span>{" "}
             — lock a new known-good snapshot
           </div>

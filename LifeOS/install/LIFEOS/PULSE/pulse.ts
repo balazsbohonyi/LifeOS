@@ -101,6 +101,7 @@ let workModule: any = null
 let localIntelligenceModule: any = null
 let telosModule: any = null
 let tabFreshnessModule: any = null
+let userIndexModule: any = null
 let hypothesesModule: any = null
 let upgradesModule: any = null
 let memoryModule: any = null
@@ -123,7 +124,7 @@ let hermesModule: any = null
 
 // Module gates read config.modules — one resolved map layering MODULE_DEFAULTS,
 // the legacy [section].enabled flags, then the [modules] table. Infrastructure
-// (observability, hooks, siri, tab-freshness, menubar, doctor) stays ungated:
+// (observability, hooks, siri, tab-freshness, user-index, menubar, doctor) stays ungated:
 // it is how Pulse serves anything at all, not a surface you switch off.
 // ported from public PR #1748, @elhoim
 async function loadModules(config: PulseConfig) {
@@ -239,6 +240,13 @@ async function loadModules(config: PulseConfig) {
     tabFreshnessModule = await import("./modules/tab-freshness")
   } catch (err) {
     log("warn", "Tab freshness module not available", { error: String(err) })
+  }
+  // USER index — provides the live USER/ file index consumed by Life and other
+  // dashboard surfaces. It is infrastructure, not an optional user-facing tab.
+  try {
+    userIndexModule = await import("./modules/user-index")
+  } catch (err) {
+    log("warn", "USER index module not available", { error: String(err) })
   }
   // Memory — autonomic-memory subsystem state surface.
   if (config.modules.memory) {
@@ -785,6 +793,16 @@ async function main() {
     log("info", "Observability module loaded")
   }
 
+  if (userIndexModule) {
+    try {
+      await userIndexModule.start()
+      log("info", "USER index module loaded")
+    } catch (err) {
+      log("error", "USER index module failed to start", { error: String(err) })
+      userIndexModule = null
+    }
+  }
+
   if (performanceModule && config.modules.performance) {
     performanceModule.startPerformance(config.performance)
     log("info", "Performance module loaded")
@@ -1275,6 +1293,7 @@ async function main() {
   // ── Cleanup ──
   server.stop()
   if (imessageModule) imessageModule.stopIMessage?.()
+  if (userIndexModule) await userIndexModule.stop?.()
   if (assistantModule) assistantModule.stopAssistant?.()
   releaseOwnedLock()
   if (syslogModule) await syslogModule.stop?.()

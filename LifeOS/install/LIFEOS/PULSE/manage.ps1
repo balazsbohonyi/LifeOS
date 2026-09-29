@@ -144,8 +144,21 @@ function Get-PulseLock {
 
 function ConvertTo-ProcessCreationTime {
     param($Value)
-    if ($Value -is [DateTime]) { return $Value.ToUniversalTime() }
-    try { return [Management.ManagementDateTimeConverter]::ToDateTime([string]$Value).ToUniversalTime() } catch { return $null }
+    if ($Value -is [DateTimeOffset]) { return $Value.UtcDateTime }
+    if ($Value -is [DateTime]) {
+        # Windows PowerShell ConvertFrom-Json turns ISO-8601 UTC strings ending
+        # in Z into DateTime values with Kind=Unspecified. Preserve those clock
+        # fields as UTC instead of interpreting them in the machine's timezone.
+        if ($Value.Kind -eq [DateTimeKind]::Unspecified) {
+            return [DateTime]::SpecifyKind($Value, [DateTimeKind]::Utc)
+        }
+        return $Value.ToUniversalTime()
+    }
+    try {
+        return ([DateTimeOffset]::Parse([string]$Value, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind)).UtcDateTime
+    } catch {
+        try { return [Management.ManagementDateTimeConverter]::ToDateTime([string]$Value).ToUniversalTime() } catch { return $null }
+    }
 }
 
 function Test-ProcessIdentity {
@@ -156,7 +169,7 @@ function Test-ProcessIdentity {
     if (-not (Test-PathEqual $process.ExecutablePath $Lock.executablePath)) { return $false }
     if (([string]$process.CommandLine).IndexOf([string]$Lock.scriptPath, [StringComparison]::OrdinalIgnoreCase) -lt 0) { return $false }
     $actualStart = ConvertTo-ProcessCreationTime $process.CreationDate
-    try { $claimedStart = ([DateTimeOffset]::Parse([string]$Lock.processStartedAt)).UtcDateTime } catch { return $false }
+    $claimedStart = ConvertTo-ProcessCreationTime $Lock.processStartedAt
     if (-not $actualStart -or [Math]::Abs(($actualStart - $claimedStart).TotalSeconds) -gt 5) { return $false }
     if (-not $AllowStoppedLauncher) {
         if (-not $Lock.launcherPid -or -not $Lock.launcherExecutablePath -or -not $Lock.launcherScriptPath -or -not $Lock.launcherStartedAt) { return $false }
@@ -165,7 +178,7 @@ function Test-ProcessIdentity {
         if (-not $launcher -or -not (Test-PathEqual $launcher.ExecutablePath $Lock.launcherExecutablePath)) { return $false }
         if (([string]$launcher.CommandLine).IndexOf([string]$Lock.launcherScriptPath, [StringComparison]::OrdinalIgnoreCase) -lt 0) { return $false }
         $actualLauncherStart = ConvertTo-ProcessCreationTime $launcher.CreationDate
-        try { $claimedLauncherStart = ([DateTimeOffset]::Parse([string]$Lock.launcherStartedAt)).UtcDateTime } catch { return $false }
+        $claimedLauncherStart = ConvertTo-ProcessCreationTime $Lock.launcherStartedAt
         if (-not $actualLauncherStart -or [Math]::Abs(($actualLauncherStart - $claimedLauncherStart).TotalSeconds) -gt 5) { return $false }
     }
     return $true

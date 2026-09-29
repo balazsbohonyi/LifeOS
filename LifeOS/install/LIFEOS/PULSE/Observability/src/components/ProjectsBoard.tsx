@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ExternalLink, Terminal, FolderClosed, RotateCw, FolderGit2 } from "lucide-react";
 import { Panel, Pill, EmptyState } from "@/components/ui/chrome";
 import type { Dim } from "@/components/ui/chrome";
+import RuntimePath from "@/lib/runtime-paths";
 
 /**
  * ProjectsBoard — renders one project group (a tab's worth) from /api/projects.
@@ -59,7 +60,6 @@ export default function ProjectsBoard({ group }: { group: ProjectGroup }) {
   // file you were supposed to edit (public issue #1792, @waveman2020-sudo).
   // Every group knows its own source path, so the empty state can just say it.
   if (group.projects.length === 0) {
-    const sourcePath = `~/.claude/LIFEOS/${group.source}`;
     return (
       <EmptyState
         icon={FolderGit2}
@@ -68,7 +68,9 @@ export default function ProjectsBoard({ group }: { group: ProjectGroup }) {
           <>
             {group.error ? `${group.error}. ` : ""}
             This board is generated from{" "}
-            <code className="text-ink-2">{sourcePath}</code> — add a row there, or ask your DA to
+            <code className="text-ink-2">
+              <RuntimePath root="lifeosDir" segments={group.source.split(/[\\/]/u)} fallback="LIFEOS" />
+            </code> — add a row there, or ask your DA to
             &ldquo;add this project to my projects file&rdquo;.
           </>
         }

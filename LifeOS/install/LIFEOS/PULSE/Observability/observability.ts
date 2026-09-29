@@ -36,7 +36,7 @@ import YAML from "yaml"
 import { PULSE_BASE } from "../endpoint"
 import { RUN_ACTIVITY } from "../../TOOLS/ascent"
 import { loadLifeosConfig } from "../../TOOLS/LifeosConfig"
-import { resolveRuntimePaths } from "../../TOOLS/RuntimePaths.ts"
+import { resolveRuntimePaths, toRuntimePathDisplay } from "../../TOOLS/RuntimePaths"
 
 // Normalize env path vars that Claude Code injects without shell expansion (LifeOS#1404)
 for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
@@ -73,6 +73,7 @@ export interface ObservabilityConfig {
 // ── Path Construction ──
 
 const RUNTIME_PATHS = resolveRuntimePaths()
+const DISPLAY_PATHS = toRuntimePathDisplay(RUNTIME_PATHS)
 const HOME = RUNTIME_PATHS.home
 const LIFEOS_DIR = RUNTIME_PATHS.lifeosDir
 const MEMORY_DIR = join(LIFEOS_DIR, "MEMORY")
@@ -2379,8 +2380,7 @@ function readDirMdFiles(dir: string): { name: string, content: string, sections:
 
 function handleUserIndexApi(filter: string | null): Response {
   try {
-    const LIFEOS_DIR = process.env.LIFEOS_DIR || join(homedir(), ".claude", "LIFEOS")
-    const indexPath = join(LIFEOS_DIR, "PULSE", "state", "user-index.json")
+    const indexPath = join(RUNTIME_PATHS.pulseDir, "state", "user-index.json")
     const raw = Bun.file(indexPath)
     if (!raw.size) {
       return Response.json(
@@ -2398,6 +2398,10 @@ function handleUserIndexApi(filter: string | null): Response {
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500 })
   }
+}
+
+function handleRuntimePathsApi(): Response {
+  return Response.json(DISPLAY_PATHS)
 }
 
 // ── GET /api/life/home ──
@@ -4599,6 +4603,7 @@ export async function handleObservabilityRequest(req: Request): Promise<Response
 
     // Onboarding state — drives TemplateOnboarding banner on fresh installs
     if (pathname === "/api/onboarding/state") return handleOnboardingState()
+    if (pathname === "/api/runtime/paths") return handleRuntimePathsApi()
 
     // Knowledge
     if (pathname === "/api/knowledge") return handleKnowledgeApi()

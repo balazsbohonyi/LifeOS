@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, normalize } from "node:path";
-import { findExecutable, publishRuntimeEnvironment, resolveRuntimePaths } from "./RuntimePaths";
+import { findExecutable, publishRuntimeEnvironment, resolveRuntimePaths, toRuntimePathDisplay } from "./RuntimePaths";
 
 describe("resolveRuntimePaths", () => {
   test("uses a deployed .codex runtime without HOME", () => {
@@ -17,6 +17,9 @@ describe("resolveRuntimePaths", () => {
     expect(paths.lifeosDir).toBe(join(root, "LIFEOS"));
     expect(paths.userDir).toBe(join(root, "LIFEOS", "USER"));
     expect(paths.envPath).toBe(join(root, ".env"));
+    const display = toRuntimePathDisplay(paths);
+    expect(display.configRoot).toBe(join("~", ".codex"));
+    expect(display.userDir).toBe(join("~", ".codex", "LIFEOS", "USER"));
   });
 
   test("honors a custom config root containing spaces", () => {

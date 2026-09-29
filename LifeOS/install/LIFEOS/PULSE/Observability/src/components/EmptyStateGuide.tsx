@@ -1,12 +1,14 @@
 "use client";
 
 import { Sparkles, MessageSquare, FolderOpen, BookOpen } from "lucide-react";
+import type { ReactNode } from "react";
+import RuntimePath from "@/lib/runtime-paths";
 
 interface EmptyStateGuideProps {
   /** What this section is — used in the headline. e.g. "Telos", "Knowledge Archive". */
   section: string;
   /** Short sentence describing what kind of content lives here. */
-  description: string;
+  description: ReactNode;
   /** Subdir under LIFEOS/USER/ that holds this section's data, if any. e.g. "TELOS". */
   userDir?: string;
   /** Concrete interview command to surface. Defaults to "/interview". */
@@ -25,8 +27,7 @@ export default function EmptyStateGuide({
   daPromptExample,
   hideInterview = false,
 }: EmptyStateGuideProps) {
-  const userPath = userDir ? `~/.claude/LIFEOS/USER/${userDir}/` : "~/.claude/LIFEOS/USER/";
-  const readmePath = userDir ? `~/.claude/LIFEOS/USER/${userDir}/README.md` : "~/.claude/LIFEOS/USER/README.md";
+  const userDirSegments = userDir ? userDir.split(/[\\/]/u) : [];
   const defaultDaPrompt = daPromptExample ?? `help me set up my ${section.toLowerCase()}`;
 
   return (
@@ -64,7 +65,7 @@ export default function EmptyStateGuide({
           <div>
             <span className="text-ink-1">Edit files at </span>
             <code className="px-1.5 py-0.5 rounded bg-surface-3 text-blue-300 text-xs font-mono">
-              {userPath}
+              <RuntimePath root="userDir" segments={userDirSegments} fallback="LIFEOS/USER" />
             </code>
             <span className="text-ink-2">
               {" "}— or import existing data (Obsidian, Notion, journals) with the{" "}
@@ -81,7 +82,7 @@ export default function EmptyStateGuide({
           <div>
             <span className="text-ink-1">Read </span>
             <code className="px-1.5 py-0.5 rounded bg-surface-3 text-blue-300 text-xs font-mono">
-              {readmePath}
+              <RuntimePath root="userDir" segments={[...userDirSegments, "README.md"]} fallback="LIFEOS/USER" />
             </code>
             <span className="text-ink-2"> for the full layout and customization guide.</span>
           </div>

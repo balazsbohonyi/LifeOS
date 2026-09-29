@@ -12,6 +12,7 @@ import {
   EmptyState,
   type Dim,
 } from "@/components/ui/chrome";
+import RuntimePath from "@/lib/runtime-paths";
 
 /**
  * Usage tab — Anthropic subscription utilization + durable token/cost/model usage.
@@ -106,7 +107,7 @@ export default function UsagePage() {
               className="text-[13px] rounded-lg px-3 py-2"
               style={{ color: "var(--warn)", border: "1px solid rgba(251,191,36,0.2)", background: "rgba(251,191,36,0.05)" }}
             >
-              No per-day rollup yet. Run <code className="mono text-warn">bun ~/.claude/LIFEOS/TOOLS/UsageAggregator.ts</code> (or wait for the nightly job) to populate token/cost history.
+              No per-day rollup yet. Run <code className="mono text-warn">bun <RuntimePath root="toolsDir" segments={["UsageAggregator.ts"]} fallback="LIFEOS/TOOLS" /></code> (or wait for the nightly job) to populate token/cost history.
             </div>
           )}
 

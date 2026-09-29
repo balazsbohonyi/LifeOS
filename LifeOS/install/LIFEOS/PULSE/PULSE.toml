@@ -17,7 +17,7 @@
 # entry that opens an empty page.
 #
 # Infrastructure Pulse needs to serve anything at all — observability, hooks,
-# tab-freshness, menubar, siri, doctor — is deliberately not listed: those are
+# tab-freshness, user-index, menubar, siri, doctor — is deliberately not listed: those are
 # how Pulse runs, not modules you use.
 #
 # The older `[section].enabled` flags below still work and still win over these

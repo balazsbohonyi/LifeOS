@@ -10,7 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, normalize, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface RuntimePathEnvironment {
@@ -24,6 +24,7 @@ export interface RuntimePathEnvironment {
   Path?: string;
   LOCALAPPDATA?: string;
   ProgramFiles?: string;
+  PULSE_DIR?: string;
   [key: string]: string | undefined;
 }
 
@@ -45,6 +46,18 @@ export interface RuntimePaths {
   memoryDir: string;
   envPath: string;
   configPath: string;
+}
+
+export interface RuntimePathDisplay {
+  configRoot: string;
+  lifeosDir: string;
+  userDir: string;
+  memoryDir: string;
+  pulseDir: string;
+  toolsDir: string;
+  skillsDir: string;
+  envPath: string;
+  settingsPath: string;
 }
 
 export type RuntimeEnvironmentTarget = Pick<
@@ -119,6 +132,31 @@ export function resolveRuntimePaths(options: ResolveRuntimePathOptions = {}): Ru
   };
 }
 
+function displayFromHome(path: string, home: string): string {
+  const relativePath = relative(home, path);
+  if (!relativePath) return "~";
+  if (relativePath === ".." || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
+    return normalize(path);
+  }
+  return join("~", relativePath);
+}
+
+/** Runtime-owned paths safe for display in Pulse's local dashboard. */
+export function toRuntimePathDisplay(paths: RuntimePaths): RuntimePathDisplay {
+  const show = (path: string) => displayFromHome(path, paths.home);
+  return {
+    configRoot: show(paths.configRoot),
+    lifeosDir: show(paths.lifeosDir),
+    userDir: show(paths.userDir),
+    memoryDir: show(paths.memoryDir),
+    pulseDir: show(paths.pulseDir),
+    toolsDir: show(paths.toolsDir),
+    skillsDir: show(join(paths.configRoot, "skills")),
+    envPath: show(paths.envPath),
+    settingsPath: show(join(paths.configRoot, "settings.json")),
+  };
+}
+
 /**
  * Publish one canonical path set for all modules and child processes.
  *
@@ -128,7 +166,7 @@ export function resolveRuntimePaths(options: ResolveRuntimePathOptions = {}): Ru
  */
 export function publishRuntimeEnvironment(
   paths: RuntimePaths,
-  env: RuntimeEnvironmentTarget = process.env,
+  env: RuntimeEnvironmentTarget = process.env as RuntimeEnvironmentTarget,
 ): RuntimeEnvironmentTarget {
   env.HOME = paths.home;
   env.CLAUDE_CONFIG_DIR = paths.configRoot;

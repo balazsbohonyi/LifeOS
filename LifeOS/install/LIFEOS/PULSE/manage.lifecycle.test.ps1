@@ -33,6 +33,15 @@ try {
     }
     Assert-True (Test-ProcessIdentity $lock -AllowStoppedLauncher) "the current process identity did not validate"
 
+    # Windows PowerShell's ConvertFrom-Json can unwrap a UTC ISO string into
+    # an Unspecified DateTime. That value must retain UTC semantics rather than
+    # being shifted by the local timezone when process ownership is checked.
+    $utcFixture = "2026-09-28T23:24:14.311Z"
+    $expectedUtc = [DateTimeOffset]::Parse($utcFixture).UtcDateTime
+    $jsonDate = ('{"startedAt":"' + $utcFixture + '"}' | ConvertFrom-Json).startedAt
+    $normalizedJsonDate = ConvertTo-ProcessCreationTime $jsonDate
+    Assert-True ($normalizedJsonDate -and [Math]::Abs(($normalizedJsonDate - $expectedUtc).TotalSeconds) -lt 1) "a JSON-parsed UTC timestamp was shifted by the local timezone"
+
     $wrongStart = $lock | Select-Object *
     $wrongStart.processStartedAt = $created.AddMinutes(-10).ToString("o")
     Assert-True (-not (Test-ProcessIdentity $wrongStart -AllowStoppedLauncher)) "a reused PID with a different creation time was accepted"

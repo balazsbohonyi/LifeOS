@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Radar, Circle, GitCommit, Cpu, MonitorSmartphone, Sparkles, Github } from "lucide-react";
 import { PageShell, PageHeader, Panel, PanelHeader, StatTile, EmptyState } from "@/components/ui/chrome";
+import RuntimePath from "@/lib/runtime-paths";
 
 /**
  * Conduit tab — LifeOS's sensory layer. This component holds ZERO data; it fetches
@@ -187,7 +188,7 @@ export default function ConduitPage() {
                     <div className="text-xs text-ink-3">
                       The insight job runs on the hour. Use <span className="text-ink-2 mono">run now</span> above, or
                       from a shell:{" "}
-                      <code className="text-ink-2 mono">bun ~/.claude/LIFEOS/PULSE/Conduit/BuildInsight.ts</code>
+                      <code className="text-ink-2 mono">bun <RuntimePath root="pulseDir" segments={["Conduit", "BuildInsight.ts"]} fallback="LIFEOS/PULSE" /></code>
                     </div>
                   )
                 )}

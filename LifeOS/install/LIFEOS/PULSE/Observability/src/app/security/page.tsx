@@ -10,6 +10,7 @@ import {
   type Dim,
 } from "@/components/ui/chrome";
 import type { LucideIcon } from "lucide-react";
+import RuntimePath from "@/lib/runtime-paths";
 
 // ── API shape (as of the 2026-05-06 minimal-v1 security model) ──
 // GET /api/security             → { model, description, denyList, hooks }
@@ -375,7 +376,7 @@ function RiskRegisterSection({ tm }: { tm: PrivateData<ThreatModelData> }) {
         <SectionHeader icon={FileWarning} title="Risk Register" accentClass="text-warn" />
         <Panel>
           <p className="text-xs text-center py-6 text-ink-3">
-            No risk register yet — run <code className="mono text-ink-2">bun ~/.claude/skills/ThreatModel/Tools/RiskRegister.ts init</code>
+            No risk register yet — run <code className="mono text-ink-2">bun <RuntimePath root="skillsDir" segments={["ThreatModel", "Tools", "RiskRegister.ts"]} fallback="LifeOS skills" /> init</code>
           </p>
         </Panel>
       </div>
@@ -560,7 +561,7 @@ export default function SecurityPage() {
           </Panel>
         )}
         <p className="text-xs mt-3 ml-1 text-ink-3">
-          Hook wiring lives in <code className="text-ink-2">~/.claude/settings.json</code>.
+          Hook wiring lives in <code className="text-ink-2"><RuntimePath root="settingsPath" fallback="LifeOS config/settings.json" /></code>.
         </p>
       </div>
     </PageShell>

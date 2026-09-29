@@ -8,7 +8,7 @@ for (const __k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
 /**
  * UserIndex — Life OS USER/ indexer and Pulse module.
  *
- * Walks ~/.claude/LIFEOS/USER/, parses frontmatter + body of every .md file,
+ * Walks the selected LifeOS runtime's USER/ directory, parses frontmatter + body of every .md file,
  * computes derived fields (staleness, completeness, item_count, preview),
  * and writes a typed JSON index at Pulse/state/user-index.json.
  *
@@ -28,7 +28,7 @@ for (const __k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
 
 import { readFileSync, writeFileSync, statSync, readdirSync, mkdirSync, existsSync, watch } from "fs"
 import { join, relative, basename, dirname } from "path"
-import { homedir } from "node:os";
+import { resolveRuntimePaths, type ResolveRuntimePathOptions } from "../../TOOLS/RuntimePaths.ts"
 
 // Normalize env path vars that Claude Code injects without shell expansion (LifeOS#1404)
 for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
@@ -37,11 +37,23 @@ for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
 }
 
 
-const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir()
-const LIFEOS_DIR = process.env.LIFEOS_DIR || join(HOME, ".claude", "LIFEOS")
-const USER_DIR = join(LIFEOS_DIR, "USER")
-const STATE_DIR = join(LIFEOS_DIR, "PULSE", "state")
-const INDEX_PATH = join(STATE_DIR, "user-index.json")
+export interface UserIndexPaths {
+  userDir: string
+  indexPath: string
+}
+
+export function resolveUserIndexPaths(options: ResolveRuntimePathOptions = {}): UserIndexPaths {
+  const runtime = resolveRuntimePaths(options)
+  const stateDir = join(runtime.pulseDir, "state")
+  return {
+    userDir: runtime.userDir,
+    indexPath: join(stateDir, "user-index.json"),
+  }
+}
+
+const INDEX_PATHS = resolveUserIndexPaths()
+const USER_DIR = INDEX_PATHS.userDir
+const INDEX_PATH = INDEX_PATHS.indexPath
 const MODULE_NAME = "user-index"
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -320,11 +332,11 @@ function extractTitle(body: string, fallbackPath: string): string {
 // File parser
 // ───────────────────────────────────────────────────────────────────────────
 
-function parseFile(absolutePath: string): UserIndexEntry {
+function parseFile(absolutePath: string, userDir = USER_DIR): UserIndexEntry {
   const content = readFileSync(absolutePath, "utf-8")
   const { meta, body } = parseFrontmatter(content)
   const stat = statSync(absolutePath)
-  const relPath = relative(USER_DIR, absolutePath).split("\\").join("/")
+  const relPath = relative(userDir, absolutePath).split("\\").join("/")
 
   // Fallback inference if frontmatter missing
   const inferred = !meta.category && !meta.kind
@@ -406,7 +418,7 @@ const SKIP_DIRS = new Set([
   "node_modules", ".git", "Backups",
 ])
 
-function walkUserDir(): string[] {
+function walkUserDir(userDir = USER_DIR): string[] {
   const files: string[] = []
   function walk(dir: string, depth: number) {
     if (!existsSync(dir)) return
@@ -422,7 +434,7 @@ function walkUserDir(): string[] {
       }
     }
   }
-  walk(USER_DIR, 0)
+  walk(userDir, 0)
   return files
 }
 
@@ -430,8 +442,8 @@ function walkUserDir(): string[] {
 // Index builder
 // ───────────────────────────────────────────────────────────────────────────
 
-function buildIndex(): UserIndex {
-  const files = walkUserDir().map(parseFile)
+export function buildIndex(userDir = USER_DIR): UserIndex {
+  const files = walkUserDir(userDir).map(file => parseFile(file, userDir))
 
   const by_category = {
     identity: [] as UserIndexEntry[],
@@ -496,7 +508,7 @@ function buildIndex(): UserIndex {
   return {
     version: "1.0.0",
     generated_at: new Date().toISOString(),
-    user_dir: USER_DIR,
+    user_dir: userDir,
     files,
     by_category,
     domains,
@@ -516,9 +528,10 @@ function buildIndex(): UserIndex {
   }
 }
 
-function writeIndex(index: UserIndex): void {
-  if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true })
-  writeFileSync(INDEX_PATH, JSON.stringify(index, null, 2))
+export function writeIndex(index: UserIndex, indexPath = INDEX_PATH): void {
+  const stateDir = dirname(indexPath)
+  if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true })
+  writeFileSync(indexPath, JSON.stringify(index, null, 2))
 }
 
 // ───────────────────────────────────────────────────────────────────────────
