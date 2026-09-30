@@ -947,6 +947,32 @@ async function main() {
         if (resp) return resp
       }
 
+      // The richer Assistant module is omitted from public releases, but the
+      // configured DA name is still part of the core LifeOS config. Keep the
+      // identity card useful on those installs without pretending the private
+      // diary/personality subsystem is available.
+      if (!assistantModule && req.method === "GET" && pathname === "/assistant/identity") {
+        try {
+          const identity = loadLifeosConfig({ path: CONFIG_PATH })
+          const name = identity.da.name.trim()
+          if (name && !/^LifeOS(?: Assistant)?$/i.test(name)) {
+            return Response.json({
+              name,
+              full_name: name,
+              display_name: name,
+              color: identity.da.color ?? "#3B82F6",
+              role: "primary",
+              origin_story: "",
+              has_avatar: false,
+              principal: identity.principal.name,
+              uptime_ms: Math.round(process.uptime() * 1000),
+            })
+          }
+        } catch {
+          // An absent or invalid user config remains an empty/unconfigured state.
+        }
+      }
+
       // Hermes sidecar core-file routes: /api/hermes*
       if (hermesModule && pathname.startsWith("/api/hermes")) {
         const resp = await hermesModule.handleRequest(req, pathname)

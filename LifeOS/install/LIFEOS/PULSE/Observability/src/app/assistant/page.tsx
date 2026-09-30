@@ -363,7 +363,8 @@ export default function AssistantPage() {
     { id: "diary", label: "Diary", dim: "rhythms" },
   ];
 
-  const isFreshInstall = health ? !health.identity_loaded : !identity;
+  // A failed/missing API response does not prove the DA identity is empty.
+  const isFreshInstall = health !== undefined && !health.identity_loaded;
 
   return (
     <PageShell fullBleed className="overflow-auto">
@@ -378,7 +379,7 @@ export default function AssistantPage() {
           <EmptyStateGuide
             section="DA Identity"
             description="Your DA's name, voice, personality, and the diary they keep about your work together."
-            userDir="DA"
+            userDir="DIGITAL_ASSISTANT"
             daPromptExample="set up my DA's identity and personality"
           />
         )}
