@@ -21,7 +21,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const input = JSON.parse(readFileSync("/dev/stdin", "utf-8"));
+const input = JSON.parse(readFileSync(0, "utf-8"));
 
 const { task_description } = input;
 

@@ -107,6 +107,7 @@ function spawnIntegrityMaintenance(
     // Spawn detached process
     const child = spawn('bun', [INTEGRITY_SCRIPT], {
       detached: true,
+      windowsHide: true,
       stdio: ['pipe', 'ignore', 'inherit'],  // stdin for input, ignore stdout, inherit stderr for logging
       env: { ...process.env },
     });

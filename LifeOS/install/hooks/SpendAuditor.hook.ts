@@ -32,6 +32,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, appendFileSync } from 'fs';
+import { spawn } from 'child_process';
 import { join } from 'path';
 import { resolveBun } from './lib/resolve-bin';
 import { paiPath } from './lib/paths';
@@ -400,10 +401,11 @@ async function hotPath(): Promise<void> {
 
     if (!shouldAudit(sessionId, Date.now())) return;
 
-    Bun.spawn(
-      [resolveBun(), import.meta.path, '--audit', transcriptPath, sessionId],
-      { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' },
-    ).unref();
+    // child_process + detached: Bun.spawn children are killed when this hook exits on Windows.
+    spawn(
+      resolveBun(), [import.meta.path, '--audit', transcriptPath, sessionId],
+      { stdio: 'ignore', detached: true, windowsHide: true },
+    ).on('error', () => undefined).unref();
   } catch { /* never block the session */ }
 }
 

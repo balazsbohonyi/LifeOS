@@ -63,6 +63,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, appendFileSync } from 'fs';
+import { spawn } from 'child_process';
 import { join } from 'path';
 import { resolveBun } from './lib/resolve-bin';
 import { deriveAscent, type AscentState } from '../LIFEOS/TOOLS/ascent';
@@ -449,8 +450,19 @@ function loadIndex(): SkillIndex | null {
     // process.execPath IS the running bun binary; fall back to which/known dirs.
     const bun = resolveBun();
     try {
-      Bun.spawn([bun, import.meta.path, '--rebuild-index'],
-        { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }).unref();
+      // child_process + detached: Bun.spawn children are killed when this hook exits on Windows.
+      // Spawn failures arrive as an 'error' event, not a throw, so trace them the same way.
+      const child = spawn(bun, [import.meta.path, '--rebuild-index'],
+        { stdio: 'ignore', detached: true, windowsHide: true });
+      child.on('error', (e) => {
+        try {
+          appendFileSync(
+            join(homedir(), '.claude/LIFEOS/MEMORY/OBSERVABILITY/hook-selfheal.jsonl'),
+            JSON.stringify({ ts: new Date().toISOString(), hook: 'AlgorithmNudge', action: 'rebuild-index', bun, error: String(e) }) + '\n',
+          );
+        } catch { /* observability write itself is best-effort */ }
+      });
+      child.unref();
     } catch (e) {
       // Never block the turn, but never swallow silently either — a failed
       // self-heal must leave a trace something can see.

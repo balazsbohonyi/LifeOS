@@ -196,8 +196,12 @@ async function createIssueDetached(repo: string, title: string, body: string, la
     ["gh", "issue", "create", "--repo", repo, "--title", title, "--body", body, ...labelArgs],
     { stdout: "ignore", stderr: "pipe", timeout: 8000 },
   );
-  // We do not await exited — fire-and-forget.
-  proc.exited.catch(() => undefined);
+  // Awaited: the hook calls process.exit right after this, which kills an unawaited gh child on Windows.
+  const code = await proc.exited;
+  if (code !== 0) {
+    const err = await new Response(proc.stderr).text();
+    console.error(`[ReminderRouter] gh issue create failed (exit ${code}): ${err.trim()}`);
+  }
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
@@ -208,7 +212,7 @@ async function main(): Promise<void> {
 
   let input: HookInput;
   try {
-    input = JSON.parse(readFileSync("/dev/stdin", "utf-8"));
+    input = JSON.parse(readFileSync(0, "utf-8"));
   } catch {
     process.exit(0);
   }

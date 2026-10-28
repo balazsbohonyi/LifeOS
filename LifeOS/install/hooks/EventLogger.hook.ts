@@ -249,6 +249,7 @@ function handlePostToolUse(raw: string): void {
         // (ported from public PR #1738, @elhoim)
         const proc = spawn(resolveBun(), [paiPath('TOOLS', 'WorkReconcile.ts')], {
           detached: true,
+          windowsHide: true,
           stdio: 'ignore',
         });
         proc.on('error', (err) => console.error('[WorkReconcile spawn]', err instanceof Error ? err.message : String(err)));

@@ -230,6 +230,7 @@ function spawnReviewer(turnsReviewed: number, transcriptPath: string | null): { 
       env,
       stdio: "ignore",
       detached: true,
+      windowsHide: true,
     });
     proc.unref();
     return { spawned: true, reason: `pid=${proc.pid}` };
