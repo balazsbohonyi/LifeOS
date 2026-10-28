@@ -456,7 +456,7 @@ async function playAudio(audioBuffer: ArrayBuffer, volume: number = FALLBACK_VOL
   await Bun.write(tempFile, audioBuffer)
 
   return new Promise((resolve, reject) => {
-    const proc = spawn(player.path, player.buildArgs(tempFile, volume))
+    const proc = spawn(player.path, player.buildArgs(tempFile, volume), { windowsHide: true })
 
     // Watchdog: a hung player must not wedge the serialized playback queue.
     // 2026-08-13 incident — one afplay froze for 9h and silently blocked every
@@ -502,7 +502,8 @@ async function showDesktopNotification(title: string, message: string): Promise<
       const helper = join(RUNTIME_PATHS.pulseDir, "WindowsToast.ps1")
       if (!powershell || !existsSync(helper)) throw new Error("Windows toast helper is unavailable")
       await new Promise<void>((resolve, reject) => {
-        const proc = spawn(powershell, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper, "-Title", title, "-Message", message])
+        // windowsHide + -WindowStyle Hidden: keep the toast helper from opening a visible console window on Windows.
+        const proc = spawn(powershell, ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", helper, "-Title", title, "-Message", message], { windowsHide: true })
         proc.on("error", reject)
         proc.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`toast helper exited ${code}`))))
       })
