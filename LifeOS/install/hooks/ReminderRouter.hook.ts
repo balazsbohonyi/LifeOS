@@ -194,7 +194,7 @@ async function createIssueDetached(repo: string, title: string, body: string, la
   // Detached so we never block the prompt; gh runs in the background.
   const proc = Bun.spawn(
     ["gh", "issue", "create", "--repo", repo, "--title", title, "--body", body, ...labelArgs],
-    { stdout: "ignore", stderr: "pipe", timeout: 8000 },
+    { stdout: "ignore", stderr: "pipe", timeout: 8000, windowsHide: true },
   );
   // Awaited: the hook calls process.exit right after this, which kills an unawaited gh child on Windows.
   const code = await proc.exited;

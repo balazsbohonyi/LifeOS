@@ -674,7 +674,7 @@ function findSessionJsonl(sessionId: string): string | null {
     for (const dir of [paiPath('projects'), paiPath('Projects')]) {
       if (!existsSync(dir)) continue;
       const r = Bun.spawnSync(['find', dir, '-maxdepth', '2', '-name', `${sessionId}.jsonl`],
-        { stdout: 'pipe', stderr: 'pipe', timeout: 2000 });
+        { stdout: 'pipe', stderr: 'pipe', timeout: 2000, windowsHide: true });
       const p = r.stdout.toString().trim().split('\n')[0];
       if (p && existsSync(p)) return p;
     }

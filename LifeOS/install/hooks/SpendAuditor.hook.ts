@@ -265,7 +265,7 @@ async function runInference(systemPrompt: string, userPayload: string): Promise<
       // spend judgments exceed (found by RunCalibration 2026-07-16); the
       // 90s process killer above remains the hard backstop.
       [resolveBun(), INFERENCE_TS, '--json', '--level', 'low', '--timeout', '60000', systemPrompt, userPayload],
-      { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
+      { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', windowsHide: true },
     );
     const killer = setTimeout(() => { try { proc.kill(); } catch { /* already gone */ } }, INFERENCE_TIMEOUT_MS);
     const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);

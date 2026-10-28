@@ -58,16 +58,16 @@ function setCmuxState(title: string, state: TabState, ascent?: AscentState): voi
     const phaseLabel = meta ? `${meta.icon} ${meta.label}` : state.toUpperCase();
 
     // Status pill: shows the current ascent state at a glance
-    execFileSync('cmux', ['set-status', 'phase', phaseLabel], { stdio: 'ignore', timeout: 2000 });
+    execFileSync('cmux', ['set-status', 'phase', phaseLabel], { stdio: 'ignore', timeout: 2000, windowsHide: true });
 
     // Log entry: shows what's happening with color-coded level
-    execFileSync('cmux', ['log', logLevel, title], { stdio: 'ignore', timeout: 2000 });
+    execFileSync('cmux', ['log', logLevel, title], { stdio: 'ignore', timeout: 2000, windowsHide: true });
 
     // Clear on idle/complete
     if (state === 'idle') {
-      execFileSync('cmux', ['clear-status', 'phase'], { stdio: 'ignore', timeout: 2000 });
-      execFileSync('cmux', ['clear-progress'], { stdio: 'ignore', timeout: 2000 });
-      execFileSync('cmux', ['clear-log'], { stdio: 'ignore', timeout: 2000 });
+      execFileSync('cmux', ['clear-status', 'phase'], { stdio: 'ignore', timeout: 2000, windowsHide: true });
+      execFileSync('cmux', ['clear-progress'], { stdio: 'ignore', timeout: 2000, windowsHide: true });
+      execFileSync('cmux', ['clear-log'], { stdio: 'ignore', timeout: 2000, windowsHide: true });
     }
 
     console.error(`[tab-setter] cmux sidebar: "${phaseLabel}" — ${title}`);
@@ -106,7 +106,7 @@ let kittenBinCached: string | null = null;
 function kittenBin(): string {
   if (kittenBinCached) return kittenBinCached;
   try {
-    const path = execSync('command -v kitten', { encoding: 'utf-8', timeout: 1000 }).trim();
+    const path = execSync('command -v kitten', { encoding: 'utf-8', timeout: 1000, windowsHide: true }).trim();
     if (path) { kittenBinCached = path; return path; }
   } catch { /* fall through */ }
   kittenBinCached = '/Applications/kitty.app/Contents/MacOS/kitten';
@@ -228,7 +228,7 @@ function cleanupStaleStateFiles(): void {
     let rawLs: string;
     try {
       rawLs = execFileSync('kitten', ['@', `--to=${socketPath}`, 'ls'], {
-        encoding: 'utf-8', timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'],
+        encoding: 'utf-8', timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true,
       }).trim();
     } catch { return; }
     if (!rawLs) return;
@@ -303,8 +303,8 @@ export function setTabState(opts: SetTabOptions): void {
     const winTitleArgs = winMatch
       ? ['@', toArg, 'set-window-title', winMatch, title]
       : ['@', toArg, 'set-window-title', title];
-    execFileSync(kitten, titleArgs, { stdio: 'ignore', timeout: 2000 });
-    execFileSync(kitten, winTitleArgs, { stdio: 'ignore', timeout: 2000 });
+    execFileSync(kitten, titleArgs, { stdio: 'ignore', timeout: 2000, windowsHide: true });
+    execFileSync(kitten, winTitleArgs, { stdio: 'ignore', timeout: 2000, windowsHide: true });
 
     // set-tab-color is a TAB command: match the tab holding our window, or fall
     // back to --self when called from the tab's own process (no windowId resolved).
@@ -312,7 +312,7 @@ export function setTabState(opts: SetTabOptions): void {
     const colorArgs = state === 'idle'
       ? ['@', toArg, 'set-tab-color', colorTargetArg, 'active_bg=none', 'active_fg=none', 'inactive_bg=none', 'inactive_fg=none']
       : ['@', toArg, 'set-tab-color', colorTargetArg, `active_bg=${ACTIVE_TAB_BG}`, `active_fg=${ACTIVE_TAB_FG}`, `inactive_bg=${colors.inactiveBg}`, `inactive_fg=${colors.inactiveFg}`];
-    execFileSync(kitten, colorArgs, { stdio: 'ignore', timeout: 2000 });
+    execFileSync(kitten, colorArgs, { stdio: 'ignore', timeout: 2000, windowsHide: true });
     console.error(`[tab-setter] Tab commands completed successfully`);
   } catch (err) {
     console.error(`[tab-setter] Error setting tab:`, err);
@@ -544,9 +544,9 @@ export function setAscentTab(state: AscentState, sessionId: string, summary?: st
     try {
       const progress = ascentProgress(state);
       if (progress > 0) {
-        execFileSync('cmux', ['set-progress', String(progress)], { stdio: 'ignore', timeout: 2000 });
+        execFileSync('cmux', ['set-progress', String(progress)], { stdio: 'ignore', timeout: 2000, windowsHide: true });
       } else {
-        execFileSync('cmux', ['clear-progress'], { stdio: 'ignore', timeout: 2000 });
+        execFileSync('cmux', ['clear-progress'], { stdio: 'ignore', timeout: 2000, windowsHide: true });
       }
     } catch { /* silent */ }
     return;
@@ -578,13 +578,13 @@ export function setAscentTab(state: AscentState, sessionId: string, summary?: st
     const winTitleArgs = winMatch
       ? ['@', toArg, 'set-window-title', winMatch, title]
       : ['@', toArg, 'set-window-title', title];
-    execFileSync(kitten, titleArgs, { stdio: 'ignore', timeout: 2000 });
-    execFileSync(kitten, winTitleArgs, { stdio: 'ignore', timeout: 2000 });
+    execFileSync(kitten, titleArgs, { stdio: 'ignore', timeout: 2000, windowsHide: true });
+    execFileSync(kitten, winTitleArgs, { stdio: 'ignore', timeout: 2000, windowsHide: true });
 
     const colorArgs = state === 'idle'
       ? ['@', toArg, 'set-tab-color', colorTargetArg, 'active_bg=none', 'active_fg=none', 'inactive_bg=none', 'inactive_fg=none']
       : ['@', toArg, 'set-tab-color', colorTargetArg, `active_bg=${ACTIVE_TAB_BG}`, `active_fg=${ACTIVE_TAB_FG}`, `inactive_bg=${config.tabBg}`, `inactive_fg=${config.tabFg}`];
-    execFileSync(kitten, colorArgs, { stdio: 'ignore', timeout: 2000 });
+    execFileSync(kitten, colorArgs, { stdio: 'ignore', timeout: 2000, windowsHide: true });
     console.error(`[tab-setter] Ascent tab: "${title}" (${state}, bg=${config.tabBg})`);
   } catch (err) {
     console.error(`[tab-setter] Error setting ascent tab:`, err);

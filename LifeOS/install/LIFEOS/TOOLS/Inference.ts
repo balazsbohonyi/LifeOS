@@ -273,9 +273,12 @@ async function inferenceAttempt(options: InferenceOptions, modelOverride?: strin
     let stdout = '';
     let stderr = '';
 
+    // windowsHide: each `claude --print` child is a console app. Without it, a headless
+    // call from a hook or Pulse opens its own Windows Terminal window titled "claude".
     const proc = spawn(resolveClaudeBin(), args, {
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     });
 
     // #1158: `claude --print` parses a leading-slash prompt ("/interview") as a

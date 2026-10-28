@@ -119,10 +119,10 @@ function truncate(s: string, max: number): string {
 function gitSnapshot(cwd: string): { head?: string; dirty?: boolean } | undefined {
   try {
     const head = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
-      cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 500,
+      cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 500, windowsHide: true,
     }).trim();
     const status = execFileSync('git', ['status', '--porcelain'], {
-      cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 500,
+      cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 500, windowsHide: true,
     });
     return { head, dirty: status.trim().length > 0 };
   } catch {

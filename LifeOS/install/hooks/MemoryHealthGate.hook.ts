@@ -26,6 +26,7 @@ try {
     timeout: 5000,
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
   });
   const report = JSON.parse(out);
   if (report.overall === "critical") {

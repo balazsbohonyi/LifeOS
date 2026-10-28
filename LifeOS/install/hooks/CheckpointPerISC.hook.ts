@@ -89,6 +89,7 @@ function gitRun(repo: string, args: string[]): string {
     encoding: 'utf-8',
     timeout: GIT_TIMEOUT_MS,
     stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
   });
 }
 

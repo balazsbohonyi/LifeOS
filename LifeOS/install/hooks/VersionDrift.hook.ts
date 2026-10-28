@@ -41,7 +41,7 @@ const CORE_PATHS = [
 function git(args: string[]): string {
   try {
     return execFileSync("git", ["-C", CLAUDE_DIR, ...args], {
-      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024,
+      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024, windowsHide: true,
     }).trim();
   } catch { return ""; }
 }

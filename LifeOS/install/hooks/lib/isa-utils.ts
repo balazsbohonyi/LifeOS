@@ -506,6 +506,7 @@ export function getSessionAgents(sessionUUID: string): AgentEntry[] {
     const raw: string = execSync(`tail -200 "${eventsPath}"`, {
       encoding: 'utf-8',
       timeout: 30, // 30ms hard cap
+      windowsHide: true,
     });
 
     const agents: Map<string, AgentEntry> = new Map();
