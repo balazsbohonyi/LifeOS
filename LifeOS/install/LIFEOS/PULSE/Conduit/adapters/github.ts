@@ -43,6 +43,7 @@ function ghApi(path: string, cfgDir?: string): unknown {
     const out = execFileSync("gh", ["api", "-H", "Accept: application/vnd.github+json", path], {
       encoding: "utf8",
       timeout: 15_000,
+      windowsHide: true,
       env: cfgDir ? { ...process.env, GH_CONFIG_DIR: cfgDir } : process.env,
     });
     return JSON.parse(out);

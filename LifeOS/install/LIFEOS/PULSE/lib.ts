@@ -12,6 +12,7 @@ import { rename } from "fs/promises"
 import { modelForEffort } from "../TOOLS/models.ts"
 import { findExecutable, resolveRuntimePaths } from "../TOOLS/RuntimePaths.ts"
 import { PULSE_BASE } from "./endpoint"
+import { runHidden } from "./lib/hidden-spawn"
 
 export { PULSE_BASE }
 
@@ -497,14 +498,11 @@ async function dispatchSingle(output: string, target: OutputTarget, jobName: str
           log("warn", `Email dispatch skipped for ${jobName}: 'gws' CLI not installed — the email output channel requires the Google Workspace CLI (install + auth it, or switch this job's output to log/ntfy/voice)`)
           return
         }
-        const proc = Bun.spawn([gwsPath, "gmail", "+send", "--to", recipient, "--subject", subject, "--body", output.slice(0, 50_000)], {
-          stdout: "pipe",
-          stderr: "pipe",
-          env: process.env,
+        // runHidden, not Bun.spawn: gws is a console child; it needs windowsHide on Windows.
+        await runHidden(gwsPath, ["gmail", "+send", "--to", recipient, "--subject", subject, "--body", output.slice(0, 50_000)], {
+          env: { ...process.env } as Record<string, string>,
+          timeoutMs: 30_000,
         })
-        // Deadline-raced drain (public issue #1546): same held-pipe hang class
-        // as spawnScript/spawnClaude.
-        await collectProc(proc, 30_000)
         break
       }
 
@@ -653,14 +651,13 @@ export async function collectProc(
 }
 
 async function spawnInvocation(invocation: ScriptInvocation, timeoutMs: number): Promise<string> {
-  const proc = Bun.spawn(invocation.argv, {
-    stdout: "pipe",
-    stderr: "pipe",
+  // runHidden, not Bun.spawn: a script job's console child needs windowsHide or Windows Terminal opens a window for it.
+  const [command, ...argv] = invocation.argv
+  const { stdout, stderr, exitCode, timedOut } = await runHidden(command, argv, {
     cwd: invocation.cwd,
-    env: { ...process.env },
+    env: { ...process.env } as Record<string, string>,
+    timeoutMs,
   })
-
-  const { stdout, stderr, exitCode, timedOut } = await collectProc(proc, timeoutMs)
 
   if (timedOut) throw new Error(`Script timed out after ${timeoutMs}ms: ${stderr.slice(0, 200)}`)
   if (exitCode !== 0) throw new Error(`Script exited ${exitCode}: ${stderr.slice(0, 200)}`)
@@ -720,15 +717,9 @@ export async function spawnClaude(prompt: string, opts: { model: string; timeout
   // Headless subprocess: never the desktop voice channel (2026-08-14 leak).
   env.LIFEOS_NOTIFICATION_CHANNEL = env.LIFEOS_NOTIFICATION_CHANNEL || "headless"
 
-  const proc = Bun.spawn([claudePath, ...args], {
-    stdin: new Blob([prompt]),
-    stdout: "pipe",
-    stderr: "pipe",
-    env,
-  })
-
+  // runHidden, not Bun.spawn: a claude console child needs windowsHide or Windows Terminal opens a window for it.
   const timeoutMs = opts.timeoutMs ?? 300_000
-  const { stdout: output, stderr, exitCode, timedOut } = await collectProc(proc, timeoutMs)
+  const { stdout: output, stderr, exitCode, timedOut } = await runHidden(claudePath, args, { env, input: prompt, timeoutMs })
 
   if (timedOut) throw new Error(`claude timed out after ${timeoutMs}ms: ${stderr.slice(0, 200)}`)
   if (exitCode !== 0) {

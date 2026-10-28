@@ -16,6 +16,7 @@ import { join } from "path";
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "node:os";
 import { findExecutable } from "../../TOOLS/RuntimePaths.ts";
+import { runHidden } from "../lib/hidden-spawn";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir();
 const CONFIG_ROOT = process.env.CLAUDE_CONFIG_DIR || join(HOME, ".claude");
@@ -53,14 +54,8 @@ async function refresh(): Promise<{ ok: boolean; reason?: string }> {
   try {
     const bun = findExecutable("bun");
     if (!bun) return { ok: false, reason: "Bun executable not found" };
-    const proc = Bun.spawn([bun, BUNKER_BIN, "data"], { stdout: "pipe", stderr: "pipe" });
-    const timer = setTimeout(() => { try { proc.kill(); } catch { /* already gone */ } }, REFRESH_TIMEOUT_MS);
-    const [out, errTxt, code] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-    clearTimeout(timer);
+    // runHidden, not Bun.spawn: a bun child can open a Windows Terminal window when Pulse starts it.
+    const { stdout: out, stderr: errTxt, exitCode: code } = await runHidden(bun, [BUNKER_BIN, "data"], { timeoutMs: REFRESH_TIMEOUT_MS });
     if (code !== 0) {
       return { ok: false, reason: `bunker data exit ${code}: ${errTxt.slice(0, 200)}` };
     }

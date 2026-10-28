@@ -16,6 +16,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { runHidden } from "../lib/hidden-spawn";
 
 const MODULE_NAME = "atlas";
 const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
@@ -47,20 +48,11 @@ export function health() {
 const METRICS_TIMEOUT_MS = 30_000;
 
 async function metrics(): Promise<Record<string, unknown> | null> {
-  const proc = Bun.spawn(["bun", ATLAS_CLI, "insights"], { stdout: "pipe", stderr: "pipe" });
-  // Drain stdout AND stderr concurrently, under a kill timer (same class as
-  // modules/work.ts): stderr was piped but never read, so a chatty `atlas
-  // insights` failure fills the OS pipe buffer, the child blocks on the write,
-  // and with no timeout the request hung forever while wedged children piled
-  // up on every uncached poll.
+  // Reads stdout and stderr concurrently under a kill timer (same class as
+  // modules/work.ts), so a chatty `atlas insights` failure cannot wedge the request.
+  // runHidden, not Bun.spawn: a bun child can open a Windows Terminal window when Pulse starts it.
   // ported from public PR #1736, @elhoim
-  const timer = setTimeout(() => { try { proc.kill(); } catch { /* already gone */ } }, METRICS_TIMEOUT_MS);
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  clearTimeout(timer);
+  const { stdout: out, stderr: err, exitCode: code } = await runHidden("bun", [ATLAS_CLI, "insights"], { timeoutMs: METRICS_TIMEOUT_MS });
   if (code !== 0 || !out.trim()) {
     console.log(`[${MODULE_NAME}] metrics failed (exit ${code}): ${err.slice(0, 200)}`);
     return null;
@@ -92,15 +84,12 @@ What the edge structure shows: which zones carry the most blast radius (blast_zo
 Rules: 200-320 words. Every sentence tied to a number in the data. CRITICAL: never state a worker/asset is "unused", "dead", "orphaned", or "burning money" unless unwired_workers or a stale count backs it — absence of one edge type is not absence of use. No marketing register, no dramatization, no filler. Output ONLY markdown — no preamble, no closing notes.`;
 
 async function inference(userJson: string): Promise<string | null> {
-  const proc = Bun.spawn(
-    ["bun", INFERENCE, "--level", "high", "--timeout", "120000", SYSTEM_PROMPT, userJson],
-    { stdout: "pipe", stderr: "pipe" },
+  // runHidden, not Bun.spawn: a bun child can open a Windows Terminal window when Pulse starts it.
+  const { stdout: out, stderr: err, exitCode: code } = await runHidden(
+    "bun",
+    [INFERENCE, "--level", "high", "--timeout", "120000", SYSTEM_PROMPT, userJson],
+    { timeoutMs: 130_000 },
   );
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
   if (code !== 0 || !out.trim()) {
     console.log(`[${MODULE_NAME}] inference failed (exit ${code}): ${err.slice(0, 200)}`);
     return null;

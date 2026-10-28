@@ -33,6 +33,7 @@ import { join } from "path";
 import { loadWorkConfig, type WorkConfig } from "../../../hooks/lib/work-config";
 import { getDAName } from "../../../hooks/lib/identity";
 import { homedir } from "node:os";
+import { runHidden } from "../lib/hidden-spawn";
 
 // Normalize env path vars that Claude Code injects without shell expansion (LifeOS#1404)
 for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
@@ -177,27 +178,20 @@ function extractPrincipalGoal(slug: string | undefined): string | undefined {
 // ── Fetch ───────────────────────────────────────────────────────────────────
 
 async function fetchIssues(repo: string): Promise<IssueRecord[] | null> {
-  const proc = Bun.spawn(
+  // runHidden, not Bun.spawn: gh is a console child, and a bare Bun.spawn can open a Windows Terminal window.
+  // runHidden reads stdout and stderr concurrently (issue #1482: an unread stderr pipe filled up and hung gh).
+  // It also surfaces the actual failure cause instead of a bare exit code.
+  const { stdout, stderr, exitCode } = await runHidden(
+    "gh",
     [
-      "gh", "issue", "list",
+      "issue", "list",
       "--repo", repo,
       "--state", "all",
       "--limit", "500",
       "--json", "number,title,url,state,labels,assignees,updatedAt,createdAt,body",
     ],
-    { stdout: "pipe", stderr: "pipe", timeout: 12000 },
+    { timeoutMs: 12000 },
   );
-
-  // Drain stdout AND stderr concurrently (issue #1482). stderr was piped but
-  // never read — a chatty gh error fills the OS pipe buffer, gh blocks on the
-  // write, and since only stdout was drained the whole call hung until the 12s
-  // timeout. Reading both in parallel prevents the deadlock and surfaces the
-  // actual failure cause instead of a bare exit code.
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
   if (exitCode !== 0) {
     console.error(`[${MODULE}] gh issue list failed (exit ${exitCode}): ${stderr.trim() || "no stderr"}`);
     return null;

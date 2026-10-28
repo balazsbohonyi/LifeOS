@@ -13,6 +13,7 @@ import { readFileSync } from "fs"
 import { parse } from "smol-toml"
 import { SignJWT, importPKCS8 } from "jose"
 import { homedir } from "node:os";
+import { runHidden } from "../lib/hidden-spawn";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? homedir()
 const PULSE_DIR = process.env.PULSE_DIR || join(process.env.LIFEOS_DIR || join(process.env.CLAUDE_CONFIG_DIR || join(HOME, ".claude"), "LIFEOS"), "PULSE")
@@ -285,23 +286,14 @@ async function executeWork(issue: Issue, config: WorkerConfig): Promise<{ output
   delete env.ANTHROPIC_API_KEY
   // Headless subprocess: never the desktop voice channel (2026-08-14 leak).
   env.LIFEOS_NOTIFICATION_CHANNEL = env.LIFEOS_NOTIFICATION_CHANNEL || "headless"
-  const proc = Bun.spawn(
-    [claudePath, "--print", "--model", "sonnet", "--tools", "", "--output-format", "text", "--setting-sources", "", "--system-prompt", ""],
-    {
-      stdin: new Blob([prompt]),
-      stdout: "pipe",
-      stderr: "pipe",
-      env,
-    }
+  // runHidden, not Bun.spawn: a claude console child needs windowsHide or Windows Terminal opens a window for it.
+  const { stdout: output, stderr, exitCode } = await runHidden(
+    claudePath,
+    ["--print", "--model", "sonnet", "--tools", "", "--output-format", "text", "--setting-sources", "", "--system-prompt", ""],
+    { env, input: prompt, timeoutMs: 30 * 60_000 }, // 30-minute timeout
   )
 
-  const timer = setTimeout(() => proc.kill("SIGTERM"), 30 * 60_000) // 30-minute timeout
-  const output = await new Response(proc.stdout).text()
-  const exitCode = await proc.exited
-  clearTimeout(timer)
-
   if (exitCode !== 0) {
-    const stderr = await new Response(proc.stderr).text()
     return { output: `Exit ${exitCode}: ${stderr.slice(0, 500)}`, success: false }
   }
 

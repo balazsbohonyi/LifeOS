@@ -27,7 +27,7 @@ export function capture(config: ConduitConfig): ConduitEvent[] {
       const out = execFileSync(
         "git",
         ["-C", repo, "log", `--since=${since}`, "--no-merges", `--pretty=format:%H${UNIT}%s${UNIT}%aI`],
-        { encoding: "utf8", timeout: 8000 },
+        { encoding: "utf8", timeout: 8000, windowsHide: true },
       ).trim();
       if (!out) continue;
       for (const line of out.split("\n")) {

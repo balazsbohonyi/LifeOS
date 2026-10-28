@@ -136,6 +136,7 @@ function readReconcile(): Reconcile {
       stdout: "pipe",
       stderr: "ignore",
       timeout: RECONCILE_TIMEOUT_MS,
+      windowsHide: true,
     });
     const out = new TextDecoder().decode(proc.stdout).trim();
     const value = JSON.parse(out) as Reconcile;

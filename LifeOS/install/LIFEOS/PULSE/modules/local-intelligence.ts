@@ -111,6 +111,7 @@ async function spawnRefresh(): Promise<string> {
   const child = spawn("bun", ["run", REFRESH_SCRIPT, "--fill"], {
     stdio: ["ignore", "pipe", "pipe"],
     env: process.env,
+    windowsHide: true,
   })
   child.stdout.on("data", (b) => out.write(b))
   child.stderr.on("data", (b) => out.write(b))

@@ -370,6 +370,7 @@ function runTool(script: string, args: string[]): Promise<{ code: number; stdout
       cwd: HERMES_DIR,
       env: { ...process.env },
       stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
     });
     let stdout = "";
     let stderr = "";

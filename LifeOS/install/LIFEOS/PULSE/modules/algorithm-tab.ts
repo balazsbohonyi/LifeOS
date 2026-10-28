@@ -39,6 +39,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { runHidden } from "../lib/hidden-spawn";
 
 const MODULE_NAME = "algorithm-tab";
 const HOME = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
@@ -306,15 +307,12 @@ async function chainHash(): Promise<string> {
 /* ── Inference ── */
 
 async function inference(level: "low" | "high", system: string, user: string, timeoutMs: number): Promise<string | null> {
-  const proc = Bun.spawn(
-    ["bun", INFERENCE, "--level", level, "--timeout", String(timeoutMs), system, user],
-    { stdout: "pipe", stderr: "pipe" },
+  // runHidden, not Bun.spawn: a bun child can open a Windows Terminal window when Pulse starts it.
+  const { stdout: out, stderr: err, exitCode: code } = await runHidden(
+    "bun",
+    [INFERENCE, "--level", level, "--timeout", String(timeoutMs), system, user],
+    { timeoutMs: timeoutMs + 10_000 },
   );
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
   if (code !== 0 || !out.trim()) {
     console.log(`[${MODULE_NAME}] inference(${level}) failed (exit ${code}): ${err.slice(0, 300)}`);
     return null;
@@ -425,13 +423,8 @@ function repoFor(absPath: string): string {
 }
 
 async function git(repo: string, ...args: string[]): Promise<{ code: number; out: string; err: string }> {
-  const proc = Bun.spawn(["git", "-C", repo, ...args], { stdout: "pipe", stderr: "pipe" });
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  return { code, out: out.trim(), err: err.trim() };
+  const { stdout: out, stderr: err, exitCode } = await runHidden("git", ["-C", repo, ...args], { timeoutMs: 60_000 });
+  return { code: exitCode ?? -1, out: out.trim(), err: err.trim() };
 }
 
 async function commitFiles(absPaths: string[], message: string): Promise<{ committed: boolean; detail: string }> {

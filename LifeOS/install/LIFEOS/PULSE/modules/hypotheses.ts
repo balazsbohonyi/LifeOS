@@ -34,6 +34,7 @@ for (const __k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
 import { existsSync, readFileSync, readdirSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "node:os";
+import { runHidden } from "../lib/hidden-spawn";
 
 // Normalize env path vars that Claude Code injects without shell expansion (LifeOS#1404)
 for (const k of ["LIFEOS_DIR", "LIFEOS_CONFIG_DIR", "PROJECTS_DIR"]) {
@@ -187,16 +188,12 @@ async function runPromoteFixture(pendingSlug: string): Promise<{ promoted: boole
   delete env.ANTHROPIC_AUTH_TOKEN;
   delete env.CLAUDECODE;
   try {
-    const proc = Bun.spawn(["bun", join(LIFEOS_DIR, "TOOLS", "PromoteFixture.ts"), pendingSlug], {
-      stdin: "ignore", stdout: "pipe", stderr: "pipe", env,
-    });
-    const timer = setTimeout(() => { try { proc.kill(); } catch { /* already gone */ } }, PROMOTE_TIMEOUT_MS);
-    const [out, errTxt, code] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-    clearTimeout(timer);
+    // runHidden, not Bun.spawn: a bun child can open a Windows Terminal window when Pulse starts it.
+    const { stdout: out, stderr: errTxt, exitCode: code } = await runHidden(
+      "bun",
+      [join(LIFEOS_DIR, "TOOLS", "PromoteFixture.ts"), pendingSlug],
+      { env: env as Record<string, string>, timeoutMs: PROMOTE_TIMEOUT_MS },
+    );
     if (code !== 0) {
       const detail = (out + errTxt).trim().split("\n").slice(0, 3).join(" · ");
       return { promoted: false, detail: detail || `PromoteFixture exited ${code}` };
