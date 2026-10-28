@@ -75,28 +75,20 @@ try {
     $exitCode = 1
     for ($attempt = 0; $attempt -le $RestartCount; $attempt++) {
         $pulseScript = Join-Path $pulseDir "pulse.ts"
+        # cmd.exe sends Bun's stdout and stderr straight to the log files. The earlier
+        # PowerShell stream copy stopped writing the log while Pulse kept running.
+        $command = "`"$bun`" run `"$pulseScript`" >> `"$stdoutLog`" 2>> `"$stderrLog`""
         $startInfo = New-Object Diagnostics.ProcessStartInfo
-        $startInfo.FileName = $bun
-        $startInfo.Arguments = "run `"$pulseScript`""
+        $startInfo.FileName = Join-Path $env:SystemRoot "System32\cmd.exe"
+        $startInfo.Arguments = "/d /s /c `"$command`""
         $startInfo.WorkingDirectory = $pulseDir
         $startInfo.UseShellExecute = $false
         $startInfo.CreateNoWindow = $true
-        $startInfo.RedirectStandardOutput = $true
-        $startInfo.RedirectStandardError = $true
-        $process = New-Object Diagnostics.Process
-        $process.StartInfo = $startInfo
-        $stdoutStream = [IO.File]::Open($stdoutLog, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
-        $stderrStream = [IO.File]::Open($stderrLog, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
+        $process = [Diagnostics.Process]::Start($startInfo)
         try {
-            [void]$process.Start()
-            $stdoutCopy = $process.StandardOutput.BaseStream.CopyToAsync($stdoutStream)
-            $stderrCopy = $process.StandardError.BaseStream.CopyToAsync($stderrStream)
             $process.WaitForExit()
-            [Threading.Tasks.Task]::WaitAll(@($stdoutCopy, $stderrCopy))
             $exitCode = $process.ExitCode
         } finally {
-            $stdoutStream.Dispose()
-            $stderrStream.Dispose()
             $process.Dispose()
         }
         if ($exitCode -eq 0) { break }
