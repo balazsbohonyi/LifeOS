@@ -383,7 +383,9 @@ function Register-PulseTask {
     param([string]$ResolvedBun)
     $userId = if ($env:USERDOMAIN) { "$env:USERDOMAIN\$env:USERNAME" } else { $env:USERNAME }
     $arguments = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$startScript`" -ConfigRoot `"$ConfigRoot`" -ConfigPath `"$ConfigPath`" -BunPath `"$ResolvedBun`" -RestartDelaySeconds $RestartDelaySeconds"
-    $taskAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $arguments -WorkingDirectory $pulseDir
+    # conhost --headless runs PowerShell in a console with no window and no Windows Terminal tab.
+    # A plain powershell.exe task started in Windows Terminal, so its tab was visible and closing it stopped Pulse.
+    $taskAction = New-ScheduledTaskAction -Execute "conhost.exe" -Argument "--headless powershell.exe $arguments" -WorkingDirectory $pulseDir
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
     $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
