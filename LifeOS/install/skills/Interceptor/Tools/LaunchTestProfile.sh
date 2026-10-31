@@ -53,7 +53,8 @@ LaunchTestProfile.sh: FAIL — no test profile configured.
     $USER_PREFS
   to the dedicated Interceptor test profile's on-disk directory name (e.g.
   "Profile N" — map directory -> friendly name via
-  ~/Library/Application Support/Google/Chrome/Local State, profile.info_cache).
+  ~/Library/Application Support/Google/Chrome/Local State, profile.info_cache;
+  on Windows %LOCALAPPDATA%/Google/Chrome/User Data/Local State).
 
   Refusing to launch: defaulting to any concrete profile could open the
   operator's working/monitoring profile by accident.
@@ -91,6 +92,31 @@ case "$(uname -s)" in
             --profile-directory="$CHROME_PROFILE" \
             --new-window \
             "$START_URL"
+        ;;
+    MINGW*|MSYS*|CYGWIN*)
+        # Windows (Git Bash / MSYS2 / Cygwin). Invoke chrome.exe directly, like the
+        # macOS branch: Chrome's process singleton forwards --profile-directory to
+        # the running instance, so the profile window opens whether or not the
+        # browser was already up. The (x86) fallback is a literal because bash
+        # cannot reference the ProgramFiles(x86) variable.
+        CHROME_BIN="${INTERCEPTOR_TEST_BROWSER_BIN:-}"
+        if [ -z "$CHROME_BIN" ]; then
+            for _cand in \
+                "${PROGRAMFILES:-/c/Program Files}/Google/Chrome/Application/chrome.exe" \
+                "/c/Program Files (x86)/Google/Chrome/Application/chrome.exe" \
+                "${LOCALAPPDATA:-}/Google/Chrome/Application/chrome.exe"; do
+                if [ -x "$_cand" ]; then CHROME_BIN="$_cand"; break; fi
+            done
+        fi
+        if [ -n "$CHROME_BIN" ] && [ -x "$CHROME_BIN" ]; then
+            "$CHROME_BIN" \
+                --profile-directory="$CHROME_PROFILE" \
+                --new-window \
+                "$START_URL" >/dev/null 2>&1 &
+            exit 0
+        fi
+        echo "LaunchTestProfile.sh: no chrome.exe found. Set INTERCEPTOR_TEST_BROWSER_BIN in $USER_PREFS" >&2
+        exit 1
         ;;
     *)
         echo "LaunchTestProfile.sh: unsupported OS $(uname -s)" >&2

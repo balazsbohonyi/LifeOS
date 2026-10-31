@@ -136,6 +136,14 @@ Before any `interceptor open|read|act|inspect|screenshot|navigate|tab|monitor|ne
 bash $SKILLS_DIR/Interceptor/Tools/EnsureTestProfile.sh   # runs the gate; auto-launches the test profile on exit 5/6; prints READY on success
 ```
 
+**Native Windows with no bash** (no Git for Windows, no WSL): use the PowerShell twins. Same checks, same exit codes, same READY contract, and no console window:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\skills\Interceptor\Tools\EnsureTestProfile.ps1"
+```
+
+`PreflightIsolation.ps1` and `LaunchTestProfile.ps1` are the raw gate and the launcher; all three share `Tools/Interceptor.Common.ps1`. They read `preferences.env` as plain `NAME=value` lines (no shell evaluation). The other Tools (`Capture.sh`, `CleanupTabs.sh`, `HealBridge.sh`, `Pin.sh`) are still bash-only.
+
 `EnsureTestProfile.sh` wraps `PreflightIsolation.sh` (the raw gate — still callable directly when you want no auto-launch). Both exit non-zero on any unrecoverable failure; on non-zero, STOP and surface — never fall back to Default. The gate asserts these invariants:
 
 1. **Binary version >= 0.16.0** — older builds silently ignore `--context` and fall back to whichever Chrome connection the daemon can find. That fallback is how a tab lands in the operator's Default window.

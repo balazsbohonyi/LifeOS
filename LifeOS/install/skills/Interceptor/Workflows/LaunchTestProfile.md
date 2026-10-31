@@ -24,7 +24,7 @@ In the operator's main Chrome window:
 4. Name it something obvious: `{{DA_NAME}}`, `Interceptor-Test`, or similar.
 5. Pick an avatar so the window's clearly distinguishable from the Default one.
 
-Chrome creates a new profile directory inside the existing user-data-dir, typically named `Profile 1` (or `Profile 2` if `Profile 1` already exists). You can confirm the directory name by reading `~/Library/Application Support/Google/Chrome/Local State` and looking at `profile.info_cache` — each profile entry's key is its directory name.
+Chrome creates a new profile directory inside the existing user-data-dir, typically named `Profile 1` (or `Profile 2` if `Profile 1` already exists). You can confirm the directory name by reading `~/Library/Application Support/Google/Chrome/Local State` (Windows: `%LOCALAPPDATA%\Google\Chrome\User Data\Local State`) and looking at `profile.info_cache` — each profile entry's key is its directory name.
 
 ### 2. Sign the profile into the operator's accounts
 
@@ -115,6 +115,10 @@ interceptor inspect --context "$INTERCEPTOR_TEST_CONTEXT_ID"
 ```
 
 The launcher uses `open -a` (no `-n` flag), which delegates to the existing Chrome process. Chrome opens a new window for the requested profile.
+
+On Windows (Git Bash) the launcher starts `chrome.exe` directly with `--profile-directory`, using `INTERCEPTOR_TEST_BROWSER_BIN` from `preferences.env` or the standard Program Files / `%LOCALAPPDATA%` install paths. Chrome's process singleton hands the request to the running instance, so the same new window opens. The preflight finds the extension at `%LOCALAPPDATA%\Programs\Interceptor\extension` (the folder the Windows installer creates). Whichever copy Chrome runs (Web Store or unpacked), `interceptor contexts --verbose` shows which one and its version.
+
+Without bash (no Git for Windows), use the PowerShell twins instead: `Tools\LaunchTestProfile.ps1` (this launcher), `Tools\PreflightIsolation.ps1` (the gate) and `Tools\EnsureTestProfile.ps1` (gate plus auto-launch), run as `powershell.exe -NoProfile -ExecutionPolicy Bypass -File <script>`. They behave the same and use the same exit codes.
 
 ## Standing Behavior (agent-side rule)
 

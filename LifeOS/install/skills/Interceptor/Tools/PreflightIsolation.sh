@@ -257,7 +257,9 @@ fi
 # public issue #1802, @catchingknives
 EXT_PIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/Extension"
 EXT_DIR=""
-for _cand in "${INTERCEPTOR_EXT_DIR:-}" "$EXT_PIN_DIR" "/Library/Application Support/Interceptor/extension"; do
+# Windows installer location (%LOCALAPPDATA%\Programs\Interceptor\extension). The
+# :+ form expands to empty when LOCALAPPDATA is unset, so macOS/Linux skip it.
+for _cand in "${INTERCEPTOR_EXT_DIR:-}" "$EXT_PIN_DIR" "/Library/Application Support/Interceptor/extension" "${LOCALAPPDATA:+$LOCALAPPDATA/Programs/Interceptor/extension}"; do
     [ -n "$_cand" ] || continue
     if [ -f "$_cand/manifest.json" ]; then
         EXT_DIR="$_cand"
@@ -291,8 +293,9 @@ PIN_SH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/Pin.sh"
 if [ ! -f "$EXT_DIR/manifest.json" ]; then
     cat >&2 <<EOF
 [PreflightIsolation] FAIL: no Extension found. Checked \$INTERCEPTOR_EXT_DIR, the pin
-at $EXT_DIR_DISP, and the signed-install path
-/Library/Application Support/Interceptor/extension
+at $EXT_DIR_DISP, and the signed-install paths
+/Library/Application Support/Interceptor/extension (macOS) and
+%LOCALAPPDATA%/Programs/Interceptor/extension (Windows)
 
 WHY THIS MATTERS:
   Browser control needs the unpacked extension loaded from this directory. It is
