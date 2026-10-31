@@ -256,6 +256,18 @@ function chromeBinary(): string | null {
     '/Applications/Nix Apps/Google Chrome.app/Contents/MacOS/Google Chrome',
     '/Applications/Nix Apps/Brave Browser.app/Contents/MacOS/Brave Browser',
   ];
+  // Windows: system-wide, 32-bit, and per-user installs. Built from the
+  // environment so a relocated Program Files still resolves.
+  if (process.platform === 'win32') {
+    const roots = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA]
+      .filter((r): r is string => Boolean(r));
+    for (const root of roots) {
+      candidates.push(
+        join(root, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(root, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'),
+      );
+    }
+  }
   const found = candidates.find(existsSync);
   if (found) return found;
   // PATH fallback (public PR #1567, @vibecrypto): Nix profiles expose the
@@ -417,7 +429,7 @@ const CAPS: CapSpec[] = [
         ].filter(Boolean).join('; ');
         return { ok: false, detail: `skill + browser present, but runtime setup incomplete: ${missing}` };
       }
-      return { ok: true, detail: `skill, browser (${browser.split('/').pop()}), CLI, and test-profile context all present` };
+      return { ok: true, detail: `skill, browser (${basename(browser)}), CLI, and test-profile context all present` };
     },
     fixCmd: 'run the Interceptor skill setup (clone repo, install extension, pin INTERCEPTOR_TEST_CONTEXT_ID), then re-run: bun LIFEOS/TOOLS/Doctor.ts',
   },
@@ -665,7 +677,10 @@ function hookInterpreterProblems(): string[] {
     let mode = 0;
     try { mode = statSync(resolved).mode; } catch {}
     const name = basename(resolved);
-    if (!(mode & 0o111)) { problems.push(`${name}: not executable (chmod +x)`); continue; }
+    // Windows has no execute bit (Node reports 0o666 for every file), and the
+    // Git Bash that runs hooks there treats any file with a #! line as
+    // executable. On win32 the shebang check below is the real test.
+    if (process.platform !== 'win32' && !(mode & 0o111)) { problems.push(`${name}: not executable (chmod +x)`); continue; }
     let head = '';
     try { head = readFileSync(resolved, 'utf8').slice(0, 200).split('\n')[0]; } catch {}
     if (!head.startsWith('#!')) { problems.push(`${name}: no #! shebang`); continue; }
@@ -673,6 +688,9 @@ function hookInterpreterProblems(): string[] {
     const shebang = head.slice(2).trim().split(/\s+/);
     const interp = shebang[0].endsWith('/env') ? shebang[1] : shebang[0];
     if (!interp) continue;
+    // A POSIX absolute interpreter (#!/bin/bash) is a path inside Git Bash's own
+    // filesystem, not a Windows path: existsSync cannot judge it, so say nothing.
+    if (process.platform === 'win32' && interp.startsWith('/')) continue;
     if (interp.includes('/')) {
       if (!existsSync(interp)) problems.push(`${name}: shebang interpreter ${interp} missing`);
     } else if (!which(interp)) {
