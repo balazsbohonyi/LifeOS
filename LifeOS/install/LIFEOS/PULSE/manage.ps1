@@ -161,6 +161,37 @@ function ConvertTo-ProcessCreationTime {
     }
 }
 
+# PulseStart.ps1 starts Bun through cmd.exe so stdout/stderr go straight to the log files,
+# which makes the launcher Bun's grandparent rather than its parent. Accept the launcher at
+# the end of a short parent chain whose only intermediates are the system cmd.exe; any other
+# process in the chain (or a chain that never reaches the launcher) is rejected.
+function Test-LaunchedByLauncher {
+    param($Process, $LauncherPid)
+    $cmdPath = Join-Path $env:SystemRoot "System32\cmd.exe"
+    $current = $Process
+    for ($hop = 0; $hop -lt 3; $hop++) {
+        $parentPid = [int]$current.ParentProcessId
+        if ($parentPid -eq [int]$LauncherPid) { return $true }
+        $parent = Get-CimInstance Win32_Process -Filter "ProcessId = $parentPid" -ErrorAction SilentlyContinue
+        if (-not $parent -or -not (Test-PathEqual $parent.ExecutablePath $cmdPath)) { return $false }
+        $current = $parent
+    }
+    return $false
+}
+
+# True only when the launcher PID in the lock is still the PowerShell process that wrote it:
+# same executable, command line naming PulseStart.ps1, and the recorded start time.
+function Test-LauncherIdentity {
+    param($Lock)
+    if (-not $Lock -or -not $Lock.launcherPid -or -not $Lock.launcherExecutablePath -or -not $Lock.launcherScriptPath -or -not $Lock.launcherStartedAt) { return $false }
+    $launcher = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$Lock.launcherPid)" -ErrorAction SilentlyContinue
+    if (-not $launcher -or -not (Test-PathEqual $launcher.ExecutablePath $Lock.launcherExecutablePath)) { return $false }
+    if (([string]$launcher.CommandLine).IndexOf([string]$Lock.launcherScriptPath, [StringComparison]::OrdinalIgnoreCase) -lt 0) { return $false }
+    $actualStart = ConvertTo-ProcessCreationTime $launcher.CreationDate
+    $claimedStart = ConvertTo-ProcessCreationTime $Lock.launcherStartedAt
+    return [bool]($actualStart -and $claimedStart -and [Math]::Abs(($actualStart - $claimedStart).TotalSeconds) -le 5)
+}
+
 function Test-ProcessIdentity {
     param($Lock, [switch]$AllowStoppedLauncher)
     if (-not $Lock -or -not $Lock.pid -or -not $Lock.executablePath -or -not $Lock.scriptPath -or -not $Lock.processStartedAt) { return $false }
@@ -172,14 +203,8 @@ function Test-ProcessIdentity {
     $claimedStart = ConvertTo-ProcessCreationTime $Lock.processStartedAt
     if (-not $actualStart -or [Math]::Abs(($actualStart - $claimedStart).TotalSeconds) -gt 5) { return $false }
     if (-not $AllowStoppedLauncher) {
-        if (-not $Lock.launcherPid -or -not $Lock.launcherExecutablePath -or -not $Lock.launcherScriptPath -or -not $Lock.launcherStartedAt) { return $false }
-        if ([int]$process.ParentProcessId -ne [int]$Lock.launcherPid) { return $false }
-        $launcher = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$Lock.launcherPid)" -ErrorAction SilentlyContinue
-        if (-not $launcher -or -not (Test-PathEqual $launcher.ExecutablePath $Lock.launcherExecutablePath)) { return $false }
-        if (([string]$launcher.CommandLine).IndexOf([string]$Lock.launcherScriptPath, [StringComparison]::OrdinalIgnoreCase) -lt 0) { return $false }
-        $actualLauncherStart = ConvertTo-ProcessCreationTime $launcher.CreationDate
-        $claimedLauncherStart = ConvertTo-ProcessCreationTime $Lock.launcherStartedAt
-        if (-not $actualLauncherStart -or [Math]::Abs(($actualLauncherStart - $claimedLauncherStart).TotalSeconds) -gt 5) { return $false }
+        if (-not $Lock.launcherPid -or -not (Test-LaunchedByLauncher $process $Lock.launcherPid)) { return $false }
+        if (-not (Test-LauncherIdentity $Lock)) { return $false }
     }
     return $true
 }
@@ -239,24 +264,72 @@ function Get-InstanceValidation {
     }
 }
 
+# The task action is "conhost.exe --headless powershell.exe ... PulseStart.ps1". Stopping the
+# task ends conhost but can leave the PowerShell launcher running, and that orphan restarts
+# Pulse after its retry delay and keeps the lock's launcher PID alive. End the launcher
+# itself, but only when it is provably the one recorded in the lock.
+function Stop-VerifiedLauncher {
+    param($Lock)
+    if (-not (Test-LauncherIdentity $Lock)) { return }
+    Stop-Process -Id ([int]$Lock.launcherPid) -Force -ErrorAction SilentlyContinue
+}
+
+# The process IDs of $RootPid and everything it started, found by walking parent links.
+function Get-ProcessTreeIds {
+    param([int]$RootPid)
+    $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+    $ids = New-Object System.Collections.Generic.List[int]
+    $ids.Add($RootPid)
+    for ($i = 0; $i -lt $ids.Count; $i++) {
+        foreach ($child in $all | Where-Object { $_.ParentProcessId -eq $ids[$i] }) {
+            if (-not $ids.Contains([int]$child.ProcessId)) { $ids.Add([int]$child.ProcessId) }
+        }
+    }
+    return $ids
+}
+
+# Ends every PowerShell launcher of THIS install (its command line must name this root's
+# PulseStart.ps1) together with what it started. For the cases where no verified lock is
+# available, such as stopping while Pulse is down in the launcher's retry delay, or replacing
+# or removing the task. Run it after Stop-ScheduledTask: that stops the task's own tree, and
+# this removes the launcher the task failed to take down.
+function Stop-PulseLaunchers {
+    $launchers = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.ProcessId -ne $PID -and $_.Name -match '^(powershell|pwsh)\.exe$' -and
+        ([string]$_.CommandLine).IndexOf($startScript, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    })
+    foreach ($launcher in $launchers) {
+        foreach ($id in @(Get-ProcessTreeIds ([int]$launcher.ProcessId) | Sort-Object -Descending)) {
+            Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+# When the task is not running, any launcher of this install is an orphan of an earlier task
+# stop, and the Pulse it started (still serving, or waiting to be restarted) belongs to it.
+# The strict identity check behind stop and uninstall requires a running task, so it would
+# refuse to act on that Pulse. End the orphan first and return a fresh validation.
+function Clear-OrphanedLaunchers {
+    param($Validation)
+    if ($Validation.Task -and -not $Validation.TaskRunning) {
+        Stop-PulseLaunchers
+        return (Get-InstanceValidation)
+    }
+    return $Validation
+}
+
 function Stop-VerifiedProcessTree {
     param($Validation)
     if (-not $Validation.IdentityOk) { throw "ownership-conflict: refusing to terminate Pulse without task/lock/health/process identity agreement" }
     $lock = $Validation.Lock
     $rootPid = [int]$lock.pid
     Stop-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath -ErrorAction SilentlyContinue
+    Stop-VerifiedLauncher $lock
     $deadline = (Get-Date).AddSeconds(3)
     while ((Get-Process -Id $rootPid -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 100 }
     if (-not (Get-Process -Id $rootPid -ErrorAction SilentlyContinue)) { return $true }
     if (-not (Test-ProcessIdentity $lock -AllowStoppedLauncher)) { throw "ownership-conflict: process identity changed after task stop; refusing force termination" }
-    $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
-    $ids = New-Object System.Collections.Generic.List[int]
-    $ids.Add($rootPid)
-    for ($i = 0; $i -lt $ids.Count; $i++) {
-        foreach ($child in $all | Where-Object { $_.ParentProcessId -eq $ids[$i] }) {
-            if (-not $ids.Contains([int]$child.ProcessId)) { $ids.Add([int]$child.ProcessId) }
-        }
-    }
+    $ids = Get-ProcessTreeIds $rootPid
     foreach ($id in @($ids | Sort-Object -Descending)) { Stop-Process -Id $id -Force -ErrorAction Stop }
     return $true
 }
@@ -482,6 +555,7 @@ function Install-OrRepair {
             }
             $oldInstanceId = if ($currentHealth -and $currentHealth.Body) { [string]$currentHealth.Body.instanceId } else { $null }
             Stop-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath -ErrorAction SilentlyContinue
+            Stop-PulseLaunchers
             $deadline = (Get-Date).AddSeconds(5)
             do {
                 $remainingHealth = Get-PulseHealthResponse
@@ -570,11 +644,13 @@ try {
         "stop" {
             $validation = Get-InstanceValidation
             if (-not $validation.Task -or -not $validation.TaskOwned) { throw "ownership-conflict: refusing to stop a missing or unowned task" }
+            $validation = Clear-OrphanedLaunchers $validation
             if ($validation.Responding) {
                 Stop-VerifiedProcessTree $validation | Out-Null
                 Remove-LockForInstance ([string]$validation.Lock.instanceId)
             } else {
-                Stop-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath -ErrorAction Stop
+                try { Stop-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath -ErrorAction Stop }
+                finally { Stop-PulseLaunchers }
             }
             $result = Get-StatusResult
             $result.ok = -not $result.responding
@@ -591,12 +667,14 @@ try {
         "uninstall" {
             $validation = Get-InstanceValidation
             if ($validation.Task -and -not $validation.TaskOwned) { throw "ownership-conflict: refusing to remove an unowned task" }
+            $validation = Clear-OrphanedLaunchers $validation
             if ($validation.Responding) {
                 Stop-VerifiedProcessTree $validation | Out-Null
                 Remove-LockForInstance ([string]$validation.Lock.instanceId)
             } elseif ($validation.Task) {
                 Stop-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath -ErrorAction SilentlyContinue
             }
+            Stop-PulseLaunchers
             if ($validation.Task) { Unregister-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath -Confirm:$false }
             $removedOfflineLock = if (-not $validation.Responding) { Remove-OfflineOwnedLock } else { $false }
             Remove-OwnedLegacyTask

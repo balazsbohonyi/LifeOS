@@ -56,6 +56,145 @@ try {
     Assert-True (-not (Test-ProcessIdAbsent $PID)) "the current PowerShell process was reported absent"
     Assert-True (Test-ProcessIdAbsent 2147483647) "a nonexistent PID was reported present"
 
+    # PulseStart.ps1 starts Bun through cmd.exe, so the launcher is Bun's grandparent. The
+    # launcher check must accept that chain, and reject any chain that does not end at the
+    # launcher or that passes through something other than the system cmd.exe. These use
+    # real processes: this test process is the launcher.
+    $selfCreated = ConvertTo-ProcessCreationTime $self.CreationDate
+    $psExe = (Get-Process -Id $PID).Path
+    $chainPids = New-Object System.Collections.Generic.List[int]
+    function New-ChainLock($Process, $LauncherPid) {
+        [pscustomobject]@{
+            pid = $Process.ProcessId; executablePath = $Process.ExecutablePath; scriptPath = "Start-Sleep"
+            processStartedAt = (ConvertTo-ProcessCreationTime $Process.CreationDate).ToString("o")
+            launcherPid = $LauncherPid; launcherExecutablePath = $self.ExecutablePath
+            launcherScriptPath = "manage.lifecycle.test.ps1"; launcherStartedAt = $selfCreated.ToString("o")
+        }
+    }
+    function Wait-ChildProcess([int]$ParentId, [string]$Name) {
+        for ($i = 0; $i -lt 50; $i++) {
+            $child = Get-CimInstance Win32_Process -Filter "ParentProcessId = $ParentId AND Name = '$Name'" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($child) { return $child }
+            Start-Sleep -Milliseconds 100
+        }
+        throw "no $Name child of $ParentId appeared"
+    }
+    try {
+        $sleep = "-NoProfile -Command Start-Sleep -Seconds 60"
+        # launcher -> cmd.exe -> process (the real Pulse shape)
+        $cmdProc = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\cmd.exe") -ArgumentList "/d /s /c `"`"$psExe`" $sleep`"" -PassThru -WindowStyle Hidden
+        $chainPids.Add($cmdProc.Id)
+        $viaCmd = Wait-ChildProcess $cmdProc.Id "powershell.exe"
+        Assert-True (Test-ProcessIdentity (New-ChainLock $viaCmd $PID)) "a process started through cmd.exe was not recognized as launched by the launcher"
+        Assert-True (-not (Test-ProcessIdentity (New-ChainLock $viaCmd 4))) "a launcher PID that is not in the parent chain was accepted"
+
+        # launcher -> process (no cmd.exe hop) keeps working
+        $direct = Start-Process -FilePath $psExe -ArgumentList $sleep -PassThru -WindowStyle Hidden
+        $chainPids.Add($direct.Id)
+        $directProc = Get-CimInstance Win32_Process -Filter "ProcessId = $($direct.Id)"
+        Assert-True (Test-ProcessIdentity (New-ChainLock $directProc $PID)) "a direct child of the launcher was not recognized"
+
+        # launcher -> powershell.exe -> process: an intermediate that is not cmd.exe is rejected
+        $outer = Start-Process -FilePath $psExe -ArgumentList "-NoProfile -Command & `"$psExe`" $sleep" -PassThru -WindowStyle Hidden
+        $chainPids.Add($outer.Id)
+        $inner = Wait-ChildProcess $outer.Id "powershell.exe"
+        Assert-True (-not (Test-ProcessIdentity (New-ChainLock $inner $PID))) "a chain through a non-cmd.exe process was accepted"
+    } finally {
+        foreach ($id in $chainPids) { & taskkill.exe /PID $id /T /F 2>&1 | Out-Null }
+    }
+
+    # Stopping the scheduled task can leave the PowerShell launcher running, and that orphan
+    # restarts Pulse. Stop-VerifiedLauncher must end it, but only while the PID still matches
+    # the launcher recorded in the lock. These use a real stand-in process.
+    function New-LauncherLock($Process) {
+        [pscustomobject]@{
+            launcherPid = $Process.ProcessId; launcherExecutablePath = $Process.ExecutablePath
+            launcherScriptPath = "Start-Sleep"
+            launcherStartedAt = (ConvertTo-ProcessCreationTime $Process.CreationDate).ToString("o")
+        }
+    }
+    $launcherPids = New-Object System.Collections.Generic.List[int]
+    try {
+        $standIn = Start-Process -FilePath $psExe -ArgumentList $sleep -PassThru -WindowStyle Hidden
+        $launcherPids.Add($standIn.Id)
+        $standInInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $($standIn.Id)"
+        $goodLock = New-LauncherLock $standInInfo
+        Assert-True (Test-LauncherIdentity $goodLock) "a matching launcher was not recognized"
+
+        $badStart = New-LauncherLock $standInInfo
+        $badStart.launcherStartedAt = (ConvertTo-ProcessCreationTime $standInInfo.CreationDate).AddMinutes(-10).ToString("o")
+        $badExe = New-LauncherLock $standInInfo
+        $badExe.launcherExecutablePath = Join-Path $env:WINDIR "System32\not-the-launcher.exe"
+        $badScript = New-LauncherLock $standInInfo
+        $badScript.launcherScriptPath = "C:\not-the-owner\PulseStart.ps1"
+        $noStart = New-LauncherLock $standInInfo
+        $noStart.launcherStartedAt = $null
+        $gonePid = New-LauncherLock $standInInfo
+        $gonePid.launcherPid = 2147483647
+        foreach ($case in @(@("start time", $badStart), @("executable", $badExe), @("script", $badScript), @("missing start time", $noStart), @("absent pid", $gonePid))) {
+            Assert-True (-not (Test-LauncherIdentity $case[1])) "a launcher with a wrong $($case[0]) was accepted"
+        }
+        Assert-True (-not (Test-LauncherIdentity $null)) "a null lock was accepted as a launcher"
+
+        # The ownership check still enforces the launcher half after sharing this helper.
+        $standInProc = Get-CimInstance Win32_Process -Filter "ProcessId = $($standIn.Id)"
+        $ownedLock = New-ChainLock $standInProc $PID
+        Assert-True (Test-ProcessIdentity $ownedLock) "the ownership check rejected a matching process and launcher"
+        $ownedLock.launcherStartedAt = $selfCreated.AddMinutes(-10).ToString("o")
+        Assert-True (-not (Test-ProcessIdentity $ownedLock)) "the ownership check accepted a launcher with a different start time"
+
+        # A mismatching lock must never end a process.
+        foreach ($case in @($badStart, $badExe, $badScript, $noStart, $gonePid)) { Stop-VerifiedLauncher $case }
+        Assert-True ($null -ne (Get-Process -Id $standIn.Id -ErrorAction SilentlyContinue)) "a process that did not match the lock was stopped"
+
+        # A matching lock ends it, and repeating it once it is gone is harmless.
+        Stop-VerifiedLauncher $goodLock
+        $standIn.WaitForExit(5000) | Out-Null
+        Assert-True ($null -eq (Get-Process -Id $standIn.Id -ErrorAction SilentlyContinue)) "the recorded launcher was not stopped"
+        Stop-VerifiedLauncher $goodLock
+    } finally {
+        foreach ($id in $launcherPids) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
+    }
+
+    # With Pulse down there is no verified lock to go by (stop, uninstall, repair). The sweep
+    # must find this install's launcher by its script path, end it and what it started, and
+    # leave every other process alone, including another install's launcher.
+    $sweepRoot = Join-Path ([IO.Path]::GetTempPath()) ("PulseSweep [" + [guid]::NewGuid().ToString("N").Substring(0, 8) + "] dir")
+    $sweepPids = New-Object System.Collections.Generic.List[int]
+    $savedStartScript = $script:startScript
+    try {
+        $fakeScript = '$null = Start-Process -FilePath powershell.exe -ArgumentList ''-NoProfile -Command Start-Sleep -Seconds 60'' -WindowStyle Hidden' + "`r`n" + 'Start-Sleep -Seconds 60'
+        $mine = Join-Path $sweepRoot "mine\LIFEOS\PULSE\PulseStart.ps1"
+        $other = Join-Path $sweepRoot "other\LIFEOS\PULSE\PulseStart.ps1"
+        foreach ($path in $mine, $other) {
+            New-Item -ItemType Directory -Path (Split-Path -Parent $path) -Force | Out-Null
+            [IO.File]::WriteAllText($path, $fakeScript)
+        }
+        $script:startScript = $mine
+        $ownLauncher = Start-Process -FilePath $psExe -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File "' + $mine + '"') -PassThru -WindowStyle Hidden
+        $otherLauncher = Start-Process -FilePath $psExe -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File "' + $other + '"') -PassThru -WindowStyle Hidden
+        $bystander = Start-Process -FilePath $psExe -ArgumentList $sleep -PassThru -WindowStyle Hidden
+        foreach ($p in $ownLauncher, $otherLauncher, $bystander) { $sweepPids.Add($p.Id) }
+        $ownChild = Wait-ChildProcess $ownLauncher.Id "powershell.exe"
+        $otherChild = Wait-ChildProcess $otherLauncher.Id "powershell.exe"
+        foreach ($id in $ownChild.ProcessId, $otherChild.ProcessId) { $sweepPids.Add([int]$id) }
+
+        Stop-PulseLaunchers
+        $ownLauncher.WaitForExit(5000) | Out-Null
+        Assert-True ($null -eq (Get-Process -Id $ownLauncher.Id -ErrorAction SilentlyContinue)) "this install's launcher was not stopped"
+        for ($i = 0; $i -lt 50 -and (Get-Process -Id $ownChild.ProcessId -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Milliseconds 100 }
+        Assert-True ($null -eq (Get-Process -Id $ownChild.ProcessId -ErrorAction SilentlyContinue)) "what the launcher started was left running"
+        Assert-True ($null -ne (Get-Process -Id $otherLauncher.Id -ErrorAction SilentlyContinue)) "another install's launcher was stopped"
+        Assert-True ($null -ne (Get-Process -Id $otherChild.ProcessId -ErrorAction SilentlyContinue)) "another install's child process was stopped"
+        Assert-True ($null -ne (Get-Process -Id $bystander.Id -ErrorAction SilentlyContinue)) "an unrelated PowerShell process was stopped"
+        Stop-PulseLaunchers
+    } finally {
+        $script:startScript = $savedStartScript
+        foreach ($id in $sweepPids) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
+        Start-Sleep -Milliseconds 300
+        Remove-Item -LiteralPath $sweepRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     # Strict service success is stronger than process identity. HTTP 503,
     # missing dashboard assets, and lock/health mismatches all fail; optional
     # degradation in an HTTP-200 response remains healthy.
