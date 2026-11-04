@@ -34,6 +34,7 @@ Public-by-construction code, documentation, and templates that ship in every Lif
 | `~/.claude/LIFEOS/LIFEOS_SYSTEM_PROMPT.md` | SYSTEM (after Phase C — operational rules with user-specific content move out) |
 | `~/.claude/LIFEOS/VERSION` | SYSTEM |
 | `~/.claude/LIFEOS/LIFEOS_StatusLine.sh` | SYSTEM |
+| `~/.claude/LIFEOS/LIFEOS_StatusLine.mjs` | SYSTEM |
 | `~/.claude/LIFEOS/ALGORITHM/**` | SYSTEM |
 | `~/.claude/LIFEOS/DOCUMENTATION/**` | SYSTEM (after Phase D — categorical placeholders only) |
 | `~/.claude/LIFEOS/PULSE/` (source code only — excludes `Assistant/state/`, `state/`, `logs/`, `Plans/`, `Observability/out/`) | SYSTEM (after Phase F — parameterized via LifeosConfig) |
