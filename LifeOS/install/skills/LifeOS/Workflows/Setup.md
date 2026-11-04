@@ -43,7 +43,7 @@ The skill ships everything for both tiers in its payload; nothing activates with
    | Component | What it deploys | Default |
    |-----------|-----------------|---------|
    | `hooks` | Algorithm nudges, memory, voice — most features need these | **recommended** |
-   | `statusline` | `LIFEOS_StatusLine.sh` + `settings.json` `statusLine` | optional |
+   | `statusline` | `LIFEOS_StatusLine.sh` (Windows: `LIFEOS_StatusLine.mjs`, run through `bun`) + `settings.json` `statusLine` | optional |
    | `tooltips` | `settings.json` `spinnerTipsOverride` — 265 LifeOS Claude-Code tips, shipped public-clean in `install/settings.enhancements.json` | optional |
    | `spinnerverbs` | `settings.json` `spinnerVerbs` — 523 custom spinner verbs, shipped in `install/settings.enhancements.json` | optional |
    | `agents` | the shipped `agents/` tree (copyMissing, never overwrites) | optional |

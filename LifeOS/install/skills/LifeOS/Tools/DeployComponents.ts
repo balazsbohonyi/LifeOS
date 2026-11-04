@@ -35,6 +35,7 @@
 import { execFileSync } from "node:child_process";
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { atomicWriteText } from "./lib/atomic-write";
+import { statuslineSpec } from "./lib/statusline";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { copyMissing, detectDevTree, resolveSetupConfigRoot, setupRuntimeEnvironment } from "./InstallEngine";
@@ -149,33 +150,32 @@ function launchctl(args: string[]): { ok: boolean; out: string } {
 
 // ── component deployers ──────────────────────────────────────────────
 
-/** Statusline: place the script, chmod +x, wire settings.json statusLine. */
+/**
+ * Statusline: place the script, chmod +x where it is executed directly, wire
+ * settings.json statusLine. Windows deploys the Node port (.mjs) and runs it through
+ * bun, since bash and jq cannot be assumed there (see lib/statusline.ts).
+ */
 function deployStatusline(ctx: Ctx): ComponentResult {
   const r: ComponentResult = { component: "statusline", ready: false, actions: [], blockers: [] };
-  const av = availability("LIFEOS_StatusLine.sh", ctx);
-  const scriptPath = join(ctx.lifeosDir, "LIFEOS_StatusLine.sh");
+  const { script, scriptPath, command, executable: needsChmod } = statuslineSpec(process.platform, ctx.lifeosDir, ctx.home);
+  const av = availability(script, ctx);
   const settingsPath = join(ctx.configRoot, "settings.json");
-  // Build the settings.json command from the ACTUAL install root (ctx.lifeosDir),
-  // not a hardcoded ~/.claude — a custom --config-root (e.g. ~/.claude-fable) places
-  // the script under its own LIFEOS/, and the old literal pointed at the wrong tree.
-  const command = scriptPath.startsWith(`${ctx.home}/`)
-    ? `$HOME/${scriptPath.slice(ctx.home.length + 1)}`
-    : scriptPath;
 
   if (!av.inLive && !av.inPayload) {
-    r.blockers.push(`LIFEOS_StatusLine.sh not in live tree (${scriptPath}) or payload`);
+    r.blockers.push(`${script} not in live tree (${scriptPath}) or payload`);
     return r;
   }
   r.ready = true;
   if (!ctx.apply) {
-    if (!av.inLive) r.actions.push(`copy LIFEOS_StatusLine.sh from payload → ${scriptPath}`);
-    r.actions.push(`chmod +x ${scriptPath}`, `wire settings.json statusLine → ${command}`);
+    if (!av.inLive) r.actions.push(`copy ${script} from payload → ${scriptPath}`);
+    if (needsChmod) r.actions.push(`chmod +x ${scriptPath}`);
+    r.actions.push(`wire settings.json statusLine → ${command}`);
     return r;
   }
 
   try {
-    ensurePresent("LIFEOS_StatusLine.sh", ctx);
-    chmodSync(scriptPath, 0o755);
+    ensurePresent(script, ctx);
+    if (needsChmod) chmodSync(scriptPath, 0o755);
 
     // A populated-but-unparseable settings.json must NOT be rewritten from {} —
     // that would silently drop the user's whole config. Abort with a blocker.
@@ -202,7 +202,11 @@ function deployStatusline(ctx: Ctx): ComponentResult {
     const reread = JSON.parse(readFileSync(settingsPath, "utf-8"));
     const wired = (reread.statusLine as Record<string, unknown> | undefined)?.command === command;
     let executable = false;
-    try { execFileSync("test", ["-x", scriptPath]); executable = true; } catch { executable = false; }
+    if (needsChmod) {
+      try { execFileSync("test", ["-x", scriptPath]); executable = true; } catch { executable = false; }
+    } else {
+      executable = existsSync(scriptPath); // run through bun: no exec bit, only presence matters
+    }
     r.probe = { name: "statusline-wired", passed: wired && executable, detail: `wired=${wired} executable=${executable}${alreadyWired ? " (idempotent)" : ""}` };
   } catch (err) {
     r.error = err instanceof Error ? err.message : String(err);
