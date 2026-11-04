@@ -79,6 +79,19 @@ function validRetrievalRow(row: unknown): row is Record<string, unknown> {
     nonNegativeInteger(row.returned_count) && nonNegativeFinite(row.duration_ms) && (row.top_score === undefined || nonNegativeFinite(row.top_score));
 }
 
+/** Human-readable duration for health messages: 86400000 -> "1d", 90000000 -> "1d 1h", 600000 -> "10m". */
+export function formatDuration(ms: number): string {
+  let rest = Math.max(0, Math.round(ms / 1000));
+  const parts: string[] = [];
+  for (const [label, size] of [["d", 86400], ["h", 3600], ["m", 60], ["s", 1]] as const) {
+    const n = Math.floor(rest / size);
+    rest -= n * size;
+    if (n > 0) parts.push(`${n}${label}`);
+    if (parts.length === 2) break;
+  }
+  return parts.length ? parts.join(" ") : "0s";
+}
+
 export function assessCortexEvidence(input: CortexEvidence): CortexAssessment {
   const findings: HealthFinding[] = [];
   const thresholds = input.thresholds ?? DEFAULT_CORTEX_THRESHOLDS;
@@ -87,14 +100,14 @@ export function assessCortexEvidence(input: CortexEvidence): CortexAssessment {
   else if (["failed", "parse-failed", "timed-out", "invalid"].includes(input.reviewer.status)) add(input.reviewer.status === "invalid" ? "reviewer-evidence-invalid" : `reviewer-latest-${input.reviewer.status}`, "critical", `Latest reviewer run is ${input.reviewer.status}.`, input.reviewer);
   else if (input.reviewer.status === "missing") add("reviewer-evidence-missing", "warn", "No latest reviewer evidence is available.", { ...input.reviewer, staleThresholdMs: thresholds.reviewerStaleMs });
   else if (!input.reviewer.ts || !Number.isFinite(Date.parse(input.reviewer.ts))) add("reviewer-evidence-invalid", "critical", "Reviewer success lacks a valid timestamp.", input.reviewer);
-  else { const ageMs = input.nowMs - Date.parse(input.reviewer.ts); if (ageMs < 0) add("reviewer-future", "warn", "Reviewer timestamp is in the future and cannot prove freshness.", { ...input.reviewer, ageMs }); else if (ageMs > thresholds.reviewerStaleMs) add("reviewer-stale", "warn", `Latest reviewer evidence exceeds ${thresholds.reviewerStaleMs}ms freshness window.`, { ...input.reviewer, ageMs, thresholdMs: thresholds.reviewerStaleMs }); }
+  else { const ageMs = input.nowMs - Date.parse(input.reviewer.ts); if (ageMs < 0) add("reviewer-future", "warn", "Reviewer timestamp is in the future and cannot prove freshness.", { ...input.reviewer, ageMs }); else if (ageMs > thresholds.reviewerStaleMs) add("reviewer-stale", "warn", `Latest reviewer evidence exceeds ${formatDuration(thresholds.reviewerStaleMs)} freshness window.`, { ...input.reviewer, ageMs, thresholdMs: thresholds.reviewerStaleMs }); }
   if (!input.retrieval) add("retrieval-evidence-missing", "warn", "No retrieval evidence supplied.");
   else if (input.retrieval.status === "invalid") add("retrieval-evidence-malformed", "warn", "Retrieval evidence is malformed.", input.retrieval);
-  else if (input.retrieval.status === "missing") add("retrieval-missing", "warn", `No retrieval evidence within ${thresholds.retrievalStaleMs}ms freshness window.`, { ...input.retrieval, thresholdMs: thresholds.retrievalStaleMs });
+  else if (input.retrieval.status === "missing") add("retrieval-missing", "warn", `No retrieval evidence within ${formatDuration(thresholds.retrievalStaleMs)} freshness window.`, { ...input.retrieval, thresholdMs: thresholds.retrievalStaleMs });
   else if (!input.retrieval.ts || !Number.isFinite(Date.parse(input.retrieval.ts)) || typeof input.retrieval.queryHash !== "string" || input.retrieval.queryHash.length === 0 || !nonNegativeInteger(input.retrieval.returnedCount) || !nonNegativeFinite(input.retrieval.durationMs)) add("retrieval-evidence-invalid", "warn", "Retrieval evidence lacks a valid affirmative operation result.", input.retrieval);
-  else { const ageMs = input.nowMs - Date.parse(input.retrieval.ts); if (ageMs < 0) add("retrieval-future", "warn", "Retrieval timestamp is in the future and cannot prove freshness.", { ...input.retrieval, ageMs }); else if (ageMs > thresholds.retrievalStaleMs) add("retrieval-stale", "warn", `Retrieval evidence exceeds ${thresholds.retrievalStaleMs}ms freshness window.`, { ...input.retrieval, ageMs, thresholdMs: thresholds.retrievalStaleMs }); }
+  else { const ageMs = input.nowMs - Date.parse(input.retrieval.ts); if (ageMs < 0) add("retrieval-future", "warn", "Retrieval timestamp is in the future and cannot prove freshness.", { ...input.retrieval, ageMs }); else if (ageMs > thresholds.retrievalStaleMs) add("retrieval-stale", "warn", `Retrieval evidence exceeds ${formatDuration(thresholds.retrievalStaleMs)} freshness window.`, { ...input.retrieval, ageMs, thresholdMs: thresholds.retrievalStaleMs }); }
   if (!input.proposals || input.proposals.available === false) add("proposal-evidence-missing", "warn", "Proposal evidence is absent.", input.proposals); else { if (input.proposals.malformedLines?.length) add("proposal-evidence-malformed", "warn", "Proposal JSONL is malformed.", input.proposals); if (input.proposals.pending > thresholds.proposalBacklog) add("proposal-backlog-high", "warn", `Pending proposal backlog ${input.proposals.pending} exceeds threshold ${thresholds.proposalBacklog}.`, { ...input.proposals, threshold: thresholds.proposalBacklog }); }
-  if (!input.observability || input.observability.available === false) add("observability-evidence-missing", "warn", "Observability evidence is absent.", input.observability); else { if (input.observability.bytes > thresholds.observabilityMaxBytes) add("observability-bytes-exceeded", "warn", `Observability logs use ${input.observability.bytes} bytes, above ${thresholds.observabilityMaxBytes}.`, { ...input.observability, maxBytes: thresholds.observabilityMaxBytes }); if (input.observability.oldestMs != null) { const ageMs = input.nowMs - input.observability.oldestMs; if (ageMs > thresholds.observabilityMaxAgeMs) add("observability-age-exceeded", "warn", `Oldest observability log is ${ageMs}ms old, above ${thresholds.observabilityMaxAgeMs}.`, { ...input.observability, ageMs, maxAgeMs: thresholds.observabilityMaxAgeMs }); } }
+  if (!input.observability || input.observability.available === false) add("observability-evidence-missing", "warn", "Observability evidence is absent.", input.observability); else { if (input.observability.bytes > thresholds.observabilityMaxBytes) add("observability-bytes-exceeded", "warn", `Observability logs use ${input.observability.bytes} bytes, above ${thresholds.observabilityMaxBytes}.`, { ...input.observability, maxBytes: thresholds.observabilityMaxBytes }); if (input.observability.oldestMs != null) { const ageMs = input.nowMs - input.observability.oldestMs; if (ageMs > thresholds.observabilityMaxAgeMs) add("observability-age-exceeded", "warn", `Oldest observability log is ${formatDuration(ageMs)} old, above ${formatDuration(thresholds.observabilityMaxAgeMs)}.`, { ...input.observability, ageMs, maxAgeMs: thresholds.observabilityMaxAgeMs }); } }
   if (!input.index || input.index.status === "absent") add("index-evidence-missing", "warn", "Index state is ambiguous.", input.index); else if (input.index.status === "mismatch" || input.index.status === "invalid") add(input.index.status === "mismatch" ? "index-integrity-mismatch" : "index-manifest-invalid", "critical", "Index integrity evidence failed.", input.index); else if (input.index.status === "ok" && (input.index.ageMs == null || input.index.ageMs < 0)) add("index-freshness-invalid", "warn", "Index freshness is not measurable.", input.index); else if (input.index.status === "ok" && input.index.ageMs! > thresholds.indexStaleMs) add("index-stale", "warn", "Index exceeds freshness threshold.", input.index);
   const overall: Severity = findings.some(f => f.severity === "critical") ? "critical" : findings.some(f => f.severity === "warn") ? "warn" : "ok";
   return { overall, findings, thresholds };
@@ -125,7 +138,7 @@ function reviewerEvidence(obs: string, nowMs: number, thresholds: CortexThreshol
   if (latestDir && Number.isFinite(latestDirMs) && (!Number.isFinite(latestRowMs) || latestDirMs > latestRowMs)) {
     const path = join(runsDir, latestDir);
     if (existsSync(join(path, "parse-error.txt"))) return { status: "parse-failed", ts: new Date(latestDirMs).toISOString(), runId: latestDir, evidence: join(path, "parse-error.txt"), priorSuccesses: parsed.rows.filter((r) => r.ok === true).length };
-    if (nowMs - latestDirMs > thresholds.reviewerRunGraceMs) return { status: "timed-out", ts: new Date(latestDirMs).toISOString(), runId: latestDir, evidence: path, error: `no terminal reviewer row within ${thresholds.reviewerRunGraceMs}ms`, priorSuccesses: parsed.rows.filter((r) => r.ok === true).length };
+    if (nowMs - latestDirMs > thresholds.reviewerRunGraceMs) return { status: "timed-out", ts: new Date(latestDirMs).toISOString(), runId: latestDir, evidence: path, error: `no terminal reviewer row within ${formatDuration(thresholds.reviewerRunGraceMs)}`, priorSuccesses: parsed.rows.filter((r) => r.ok === true).length };
   }
   if (!latest) return { status: "missing", evidence: `${log} and ${runsDir}` };
   const error = String(latest.error ?? "");
